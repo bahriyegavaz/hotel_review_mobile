@@ -1,10 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/image_picker_service.dart';
+import '../../auth/presentation/session_controller.dart';
 import '../domain/review.dart';
 import 'add_review_controller.dart';
 import 'review_providers.dart';
@@ -33,13 +35,25 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
 
   Future<void> _pickPhoto(PhotoSource source) async {
     try {
-      final path =
-          await ref.read(imagePickerServiceProvider).pickPhoto(source);
-      // Kullanıcı iptal ettiyse path null gelir - hiçbir şey yapma.
+      final path = await ref.read(imagePickerServiceProvider).pickPhoto(source);
+      // Kullanıcı iptal ettiyse path null gelir - bu hata değil, normal akış.
       if (path != null && mounted) {
         setState(() => _photoPath = path);
       }
-    } catch (e) {
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      // İzin reddi ile genel hatayı ayırıyoruz - kullanıcı ne yapacağını bilsin.
+      // Not: iOS Simulator'de kamera yoktur, bu hata orada da tetiklenir.
+      final message = switch (e.code) {
+        'camera_access_denied' =>
+          'Kamera izni verilmedi. Ayarlar\'dan izin verebilirsiniz.',
+        'photo_access_denied' =>
+          'Galeri izni verilmedi. Ayarlar\'dan izin verebilirsiniz.',
+        _ => 'Fotoğraf seçilemedi.',
+      };
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Fotoğraf seçilemedi.')),
@@ -104,6 +118,7 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(addReviewControllerProvider);
     final isSubmitting = state is AddReviewSubmitting;
+    final isGuest = ref.watch(isGuestProvider);
 
     ref.listen<AddReviewState>(addReviewControllerProvider, (previous, next) {
       if (next is AddReviewFailed) {
@@ -116,13 +131,46 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
             ),
           );
       }
+
       if (next is AddReviewSuccess) {
-        _showAnalysisDialog(next.review);
+        ref.read(addReviewControllerProvider.notifier).reset();
+
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('Yorumunuz kaydedildi. Teşekkür ederiz.'),
+            ),
+          );
+
+        // Yorum kaydedildikten sonra kullanıcıya AI analizi GÖSTERMİYORUZ.
+        // "Yorumunuz olumsuz bulundu" demek anlamsız - analiz yöneticiler için.
+        if (isGuest) {
+          // Misafir gönderince login ekranına döner (exitGuest -> router).
+          ref.read(sessionControllerProvider.notifier).exitGuest();
+        } else if (context.canPop()) {
+          // Personel bir önceki ekrana (dashboard) döner.
+          context.pop();
+        }
       }
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Yeni Yorum')),
+      appBar: AppBar(
+        title: Text(isGuest ? 'Yorum Bırak' : 'Yeni Yorum'),
+        // Misafirde de geri ok'u olsun - göndermeden vazgeçip login'e dönebilsin.
+        // Router'ın altında Navigator olmadığı için (misafir tek ekran),
+        // geri ok'unu elle koyup exitGuest'e bağlıyoruz.
+        leading: isGuest
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: isSubmitting
+                    ? null
+                    : () =>
+                        ref.read(sessionControllerProvider.notifier).exitGuest(),
+              )
+            : null,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -131,6 +179,14 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (isGuest) ...[
+                  Text(
+                    'Deneyiminizi bizimle paylaşın',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Text('Puan', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 _StarRating(
@@ -148,7 +204,6 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Yorumunuz',
                     alignLabelWithHint: true,
-                    border: OutlineInputBorder(),
                   ),
                   // Domain kuralını doğrudan kullanıyoruz - tek kaynak.
                   validator: NewReview.validateComment,
@@ -157,9 +212,10 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
                 TextFormField(
                   controller: _guestNameController,
                   enabled: !isSubmitting,
-                  decoration: const InputDecoration(
-                    labelText: 'Misafir adı (opsiyonel)',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: isGuest
+                        ? 'Adınız (opsiyonel)'
+                        : 'Misafir adı (opsiyonel)',
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -172,9 +228,6 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
                 const SizedBox(height: 32),
                 FilledButton(
                   onPressed: isSubmitting ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
                   child: isSubmitting
                       ? const SizedBox(
                           height: 20,
@@ -186,7 +239,7 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
                 if (isSubmitting) ...[
                   const SizedBox(height: 12),
                   Text(
-                    'Yorum kaydediliyor ve analiz ediliyor...',
+                    'Yorum kaydediliyor...',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -195,74 +248,6 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  /// Kaydedilen yorumun AI analizini gösterir.
-  /// Rapor bölüm 9'daki çıktı alanları: sentiment, category, keywords, suggestion.
-  void _showAnalysisDialog(Review review) {
-    final analysis = review.analysis;
-
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Yorum kaydedildi'),
-        content: analysis == null
-            ? const Text('Analiz sonucu henüz hazır değil.')
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _AnalysisRow('Duygu', analysis.sentiment.label),
-                  _AnalysisRow('Kategori', analysis.category),
-                  _AnalysisRow('Kelimeler', analysis.keywords.join(', ')),
-                  if (analysis.suggestion != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'Öneri',
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(analysis.suggestion!),
-                  ],
-                ],
-              ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              ref.read(addReviewControllerProvider.notifier).reset();
-              if (context.canPop()) context.pop();
-            },
-            child: const Text('Tamam'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AnalysisRow extends StatelessWidget {
-  const _AnalysisRow(this.label, this.value);
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 90,
-            child: Text(label, style: Theme.of(context).textTheme.labelLarge),
-          ),
-          Expanded(child: Text(value)),
-        ],
       ),
     );
   }
@@ -316,9 +301,6 @@ class _PhotoPicker extends StatelessWidget {
     if (photoPath == null) {
       return OutlinedButton.icon(
         onPressed: enabled ? onPick : null,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
         icon: const Icon(Icons.add_a_photo_outlined),
         label: const Text('Fotoğraf ekle (opsiyonel)'),
       );
@@ -328,7 +310,7 @@ class _PhotoPicker extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           child: Image.file(
             File(photoPath!),
             height: 200,
@@ -351,4 +333,3 @@ class _PhotoPicker extends StatelessWidget {
     );
   }
 }
-

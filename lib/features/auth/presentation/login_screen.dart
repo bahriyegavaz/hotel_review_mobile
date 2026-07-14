@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_controller.dart';
+import 'session_controller.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -33,13 +34,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
   }
 
+  /// Router bunu görüp yorum ekleme ekranına yönlendirir.
+  void _continueAsGuest() {
+    ref.read(sessionControllerProvider.notifier).continueAsGuest();
+  }
+
   @override
   Widget build(BuildContext context) {
     final loginState = ref.watch(authControllerProvider);
     final isLoading = loginState is LoginInProgress;
 
     // Yan etki: hata mesajını SnackBar ile göster.
-    // Başarı durumunda yönlendirme YAPMIYORUZ - router otomatik halleder.
+    // Başarı durumunda yönlendirme YAPMIYORUZ - router halleder.
     ref.listen<LoginState>(authControllerProvider, (previous, next) {
       if (next is LoginFailed) {
         ScaffoldMessenger.of(context)
@@ -95,7 +101,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       decoration: const InputDecoration(
                         labelText: 'E-posta',
                         prefixIcon: Icon(Icons.mail_outline),
-                        border: OutlineInputBorder(),
                       ),
                       validator: (value) {
                         final email = value?.trim() ?? '';
@@ -117,7 +122,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       decoration: InputDecoration(
                         labelText: 'Şifre',
                         prefixIcon: const Icon(Icons.lock_outline),
-                        border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
@@ -142,9 +146,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 24),
                     FilledButton(
                       onPressed: isLoading ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
                       child: isLoading
                           ? const SizedBox(
                               height: 20,
@@ -152,6 +153,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text('Giriş Yap'),
+                    ),
+                    const SizedBox(height: 16),
+                    // Ayırıcı - iki farklı yolu görsel olarak ayırıyor.
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'veya',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: isLoading ? null : _continueAsGuest,
+                      icon: const Icon(Icons.rate_review_outlined),
+                      label: const Text('Misafir olarak yorum bırak'),
                     ),
                     const SizedBox(height: 24),
                     // Fake repository kullanılırken faydalı.
@@ -162,7 +184,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         color: Theme.of(context)
                             .colorScheme
                             .surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         'Demo: admin@hotel.com / 123456\n'

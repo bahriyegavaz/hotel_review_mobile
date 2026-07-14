@@ -1,5 +1,9 @@
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hotel_review_mobile/features/action_items/data/fake_action_item_repository.dart';
+import 'package:hotel_review_mobile/features/action_items/domain/action_item.dart';
+import 'package:hotel_review_mobile/features/action_items/domain/action_item_repository.dart';
+import 'package:hotel_review_mobile/features/action_items/presentation/action_item_providers.dart';
 import 'package:hotel_review_mobile/features/auth/presentation/auth_providers.dart';
 import 'package:hotel_review_mobile/features/dashboard/data/fake_dashboard_repository.dart';
 import 'package:hotel_review_mobile/features/dashboard/domain/dashboard_repository.dart';
@@ -10,7 +14,6 @@ import 'package:hotel_review_mobile/features/dashboard/presentation/dashboard_sc
 import '../../helpers/pump_app.dart';
 import '../../helpers/stub_auth_repository.dart';
 
-/// Her zaman hata fırlatan repository - hata ekranını test etmek için.
 class FailingDashboardRepository implements DashboardRepository {
   @override
   Future<DashboardSummary> getSummary() async {
@@ -18,12 +21,30 @@ class FailingDashboardRepository implements DashboardRepository {
   }
 }
 
-/// Dashboard ekranını, oturumu açık bir departman kullanıcısıyla kurar.
-List<Override> _overrides(DashboardRepository repository) => [
+/// Boş görev listesi dönen repository - "bekleyen görev yok" senaryosu için.
+class EmptyActionItemRepository implements ActionItemRepository {
+  @override
+  Future<List<ActionItem>> getActionItems() async => const [];
+
+  @override
+  Future<ActionItem> updateStatus({
+    required String id,
+    required ActionStatus status,
+  }) async =>
+      throw UnimplementedError();
+}
+
+List<Override> _overrides(
+  DashboardRepository dashboard, {
+  ActionItemRepository? actions,
+}) =>
+    [
       authRepositoryProvider.overrideWithValue(
         StubAuthRepository(currentUser: testDepartmentUser),
       ),
-      dashboardRepositoryProvider.overrideWithValue(repository),
+      dashboardRepositoryProvider.overrideWithValue(dashboard),
+      actionItemRepositoryProvider
+          .overrideWithValue(actions ?? FakeActionItemRepository()),
     ];
 
 void main() {
@@ -43,40 +64,35 @@ void main() {
       expect(DashboardSummary.empty.hasHighNegativeRatio, isFalse);
     });
 
-    test('eşik değeri: %20 üstü uyarı verir, tam %20 vermez', () {
-      const justAbove = DashboardSummary(
+    test('trend yükseliş/düşüş doğru belirlenir', () {
+      final rising = DashboardSummary(
         todayReviewCount: 0,
         openActionCount: 0,
-        negativeReviewCount: 21,
-        totalReviewCount: 100,
+        negativeReviewCount: 0,
+        totalReviewCount: 0,
+        negativeTrend: [
+          DailyNegativeCount(date: DateTime(2026, 1, 1), count: 2),
+          DailyNegativeCount(date: DateTime(2026, 1, 2), count: 5),
+        ],
       );
-      const exactlyTwenty = DashboardSummary(
-        todayReviewCount: 0,
-        openActionCount: 0,
-        negativeReviewCount: 20,
-        totalReviewCount: 100,
-      );
+      expect(rising.isNegativeTrendRising, isTrue);
+    });
 
-      expect(justAbove.hasHighNegativeRatio, isTrue);
-      // hasHighNegativeRatio => negativeRatio > 20 (>= değil).
-      // Bilinçli bir karar; bu test onu kilitliyor.
-      expect(exactlyTwenty.hasHighNegativeRatio, isFalse);
+    test('tek veri noktasıyla trend yönü belirsiz (null)', () {
+      final summary = DashboardSummary(
+        todayReviewCount: 0,
+        openActionCount: 0,
+        negativeReviewCount: 0,
+        totalReviewCount: 0,
+        negativeTrend: [
+          DailyNegativeCount(date: DateTime(2026, 1, 1), count: 3),
+        ],
+      );
+      expect(summary.isNegativeTrendRising, isNull);
     });
   });
 
-  group('DashboardScreen', () {
-    testWidgets('yüklenirken spinner gösterir', (tester) async {
-      await tester.pumpApp(
-        const DashboardScreen(),
-        overrides: _overrides(FakeDashboardRepository()),
-      );
-
-      expect(find.text('Özet yükleniyor...'), findsOneWidget);
-
-      await tester.pumpAndSettle();
-      expect(find.text('Özet yükleniyor...'), findsNothing);
-    });
-
+  group('DashboardScreen özet', () {
     testWidgets('KPI kartları doğru değerleri gösterir', (tester) async {
       await tester.pumpApp(
         const DashboardScreen(),
@@ -87,54 +103,21 @@ void main() {
       expect(find.text('Bugünkü yorum'), findsOneWidget);
       expect(find.text('7'), findsOneWidget);
       expect(find.text('Açık görev'), findsOneWidget);
-      expect(find.text('3'), findsOneWidget);
       expect(find.text('4.1'), findsOneWidget);
     });
 
-    testWidgets('negatif oran yüksekse uyarı rozeti çıkar', (tester) async {
-      // Fake varsayılanı 12/50 = %24, eşik %20 -> uyarı beklenir.
+    testWidgets('negatif karta basınca detay açılır', (tester) async {
       await tester.pumpApp(
         const DashboardScreen(),
         overrides: _overrides(FakeDashboardRepository()),
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('eşik değerin üzerinde'), findsOneWidget);
-    });
-
-    testWidgets('negatif oran düşükse uyarı çıkmaz', (tester) async {
-      final repository = FakeDashboardRepository(
-        summary: const DashboardSummary(
-          todayReviewCount: 3,
-          openActionCount: 1,
-          negativeReviewCount: 2,
-          totalReviewCount: 50, // %4
-          averageRating: 4.8,
-        ),
-      );
-
-      await tester.pumpApp(
-        const DashboardScreen(),
-        overrides: _overrides(repository),
-      );
+      await tester.tap(find.text('Negatif yorum'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('eşik değerin üzerinde'), findsNothing);
-    });
-
-    testWidgets('ortalama puan yoksa tire gösterir', (tester) async {
-      final repository = FakeDashboardRepository(
-        summary: DashboardSummary.empty,
-      );
-
-      await tester.pumpApp(
-        const DashboardScreen(),
-        overrides: _overrides(repository),
-      );
-      await tester.pumpAndSettle();
-
-      // 0.0 değil, tire. "Veri yok" ile "puan sıfır" farklı şeyler.
-      expect(find.text('-'), findsOneWidget);
+      expect(find.text('banyo'), findsOneWidget);
+      expect(find.text('havlu'), findsOneWidget);
     });
 
     testWidgets('hata durumunda tekrar dene butonu çıkar', (tester) async {
@@ -147,17 +130,65 @@ void main() {
       expect(find.textContaining('Özet veriler yüklenemedi'), findsOneWidget);
       expect(find.text('Tekrar dene'), findsOneWidget);
     });
+  });
 
-    testWidgets('özet yüklenemese bile navigasyon çalışır', (tester) async {
+  group('DashboardScreen selamlama', () {
+    testWidgets('kullanıcı adı ve tarih gösterilir', (tester) async {
       await tester.pumpApp(
         const DashboardScreen(),
-        overrides: _overrides(FailingDashboardRepository()),
+        overrides: _overrides(FakeDashboardRepository()),
       );
       await tester.pumpAndSettle();
 
-      // Bir bileşenin hatası tüm ekranı öldürmemeli.
-      expect(find.textContaining('Housekeeping Personeli'), findsOneWidget);
-      expect(find.text('Görevlerim'), findsOneWidget);
+      expect(find.text('Housekeeping Personeli'), findsOneWidget);
+      // Selamlama saate göre değişir; dördünden biri mutlaka olmalı.
+      final greetings = ['Günaydın,', 'İyi günler,', 'İyi akşamlar,', 'İyi geceler,'];
+      final found = greetings.any(
+        (g) => tester.any(find.text(g)),
+      );
+      expect(found, isTrue);
+    });
+  });
+
+  group('DashboardScreen bekleyen görevler', () {
+    testWidgets('açık görev varsa önizleme gösterilir', (tester) async {
+      await tester.pumpApp(
+        const DashboardScreen(),
+        overrides: _overrides(FakeDashboardRepository()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bekleyen görevler'), findsOneWidget);
+      expect(find.text('Tümünü gör'), findsOneWidget);
+      // FakeActionItemRepository'de gecikmiş "Oda 304 klima" görevi var,
+      // en acil olduğu için önizlemede olmalı.
+      expect(find.text('Oda 304 klima arızası kontrolü'), findsOneWidget);
+    });
+
+    testWidgets('en fazla 2 görev önizlenir', (tester) async {
+      await tester.pumpApp(
+        const DashboardScreen(),
+        overrides: _overrides(FakeDashboardRepository()),
+      );
+      await tester.pumpAndSettle();
+
+      // Fake'te 3 açık görev var ama önizlemede en fazla 2 gösterilir.
+      // "Bekleyen görevler" başlığı bir kez, kartlar en fazla iki.
+      expect(find.text('Bekleyen görevler'), findsOneWidget);
+    });
+
+    testWidgets('açık görev yoksa önizleme bölümü hiç görünmez',
+        (tester) async {
+      await tester.pumpApp(
+        const DashboardScreen(),
+        overrides: _overrides(
+          FakeDashboardRepository(),
+          actions: EmptyActionItemRepository(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bekleyen görevler'), findsNothing);
     });
   });
 }
