@@ -106,16 +106,16 @@ void main() {
       expect(find.text('4.1'), findsOneWidget);
     });
 
-    testWidgets('negatif karta basınca detay açılır', (tester) async {
+    testWidgets('negatif detay (trend ve şikayetler) tıklamadan görünür',
+        (tester) async {
       await tester.pumpApp(
         const DashboardScreen(),
         overrides: _overrides(FakeDashboardRepository()),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Negatif yorum'));
-      await tester.pumpAndSettle();
-
+      // Negatif detay artık hep açık - karta tıklamaya gerek yok.
+      // Tekrar eden şikayetler doğrudan görünür.
       expect(find.text('banyo'), findsOneWidget);
       expect(find.text('havlu'), findsOneWidget);
     });
@@ -133,18 +133,21 @@ void main() {
   });
 
   group('DashboardScreen selamlama', () {
-    testWidgets('kullanıcı adı ve tarih gösterilir', (tester) async {
+    testWidgets('kullanıcı adı ve selamlama gösterilir', (tester) async {
       await tester.pumpApp(
         const DashboardScreen(),
         overrides: _overrides(FakeDashboardRepository()),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Housekeeping Personeli'), findsOneWidget);
-      // Selamlama saate göre değişir; dördünden biri mutlaka olmalı.
-      final greetings = ['Günaydın,', 'İyi günler,', 'İyi akşamlar,', 'İyi geceler,'];
+      // Kullanıcı adı hero başlığında görünür.
+      expect(find.textContaining('Housekeeping Personeli'), findsOneWidget);
+
+      // Selamlama saate göre değişir ve hero'da isimle birleşik, virgülsüz
+      // (örn. "Günaydın Housekeeping Personeli 👋"). Bu yüzden textContaining.
+      final greetings = ['Günaydın', 'Merhaba', 'İyi akşamlar', 'İyi geceler'];
       final found = greetings.any(
-        (g) => tester.any(find.text(g)),
+        (g) => tester.any(find.textContaining(g)),
       );
       expect(found, isTrue);
     });

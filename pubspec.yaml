@@ -70,6 +70,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/logo.png
+    - assets/images/hotels/1.jpeg
+    - assets/images/hotels/2.jpg
+    - assets/images/hotels/3.jpg
    
 
   # To add assets to your application, add an assets section, like this:
