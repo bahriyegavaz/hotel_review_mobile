@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+
+import '../../../core/widget/loading_skeleton.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widget/app_drawer.dart';
 import '../../action_items/domain/action_item.dart';
 import '../../auth/presentation/session_controller.dart';
 import '../domain/dashboard_repository.dart';
 import '../domain/dashboard_summary.dart';
 import 'dashboard_preview_providers.dart';
 import 'dashboard_providers.dart';
+import 'negative_trend_chart.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -27,64 +33,55 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final urgentAsync = ref.watch(urgentActionItemsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Çıkış Yap',
-            onPressed: () =>
-                ref.read(sessionControllerProvider.notifier).logout(),
-          ),
-        ],
-      ),
+      drawer: const AppDrawer(),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push(AppRoutes.addReview),
-        icon: const Icon(Icons.add_comment_outlined),
+        icon: const Icon(LucideIcons.message_square_plus),
         label: const Text('Yorum Ekle'),
       ),
-      body: RefreshIndicator(
-        onRefresh: () =>
-            ref.read(dashboardControllerProvider.notifier).refresh(),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          children: [
-            _GreetingHeader(name: user?.fullName),
-            const SizedBox(height: 24),
-            summaryAsync.when(
-              loading: () => const _LoadingCards(),
-              error: (error, _) => _SummaryError(
-                message: error is DashboardFailure
-                    ? error.message
-                    : 'Özet veriler yüklenemedi.',
-                onRetry: () =>
-                    ref.read(dashboardControllerProvider.notifier).refresh(),
-              ),
-              data: (summary) => _SummaryCards(
-                summary: summary,
-                negativeExpanded: _negativeExpanded,
-                onToggleNegative: () => setState(
-                  () => _negativeExpanded = !_negativeExpanded,
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: () =>
+              ref.read(dashboardControllerProvider.notifier).refresh(),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+            children: [
+              _GreetingHeader(name: user?.fullName),
+              const SizedBox(height: 24),
+              summaryAsync.when(
+                loading: () => const DashboardSkeleton(),
+                error: (error, _) => _SummaryError(
+                  message: error is DashboardFailure
+                      ? error.message
+                      : 'Özet veriler yüklenemedi.',
+                  onRetry: () =>
+                      ref.read(dashboardControllerProvider.notifier).refresh(),
                 ),
-                onOpenActions: () => context.push(AppRoutes.actionItems),
+                data: (summary) => _SummaryCards(
+                  summary: summary,
+                  negativeExpanded: _negativeExpanded,
+                  onToggleNegative: () => setState(
+                    () => _negativeExpanded = !_negativeExpanded,
+                  ),
+                  onOpenActions: () => context.push(AppRoutes.actionItems),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            // Bekleyen görev önizlemesi - sadece açık görev varsa gösterilir.
-            _UrgentTasksSection(
-              urgentAsync: urgentAsync,
-              onSeeAll: () => context.push(AppRoutes.actionItems),
-            ),
-            const SizedBox(height: 80),
-          ],
+              const SizedBox(height: 24),
+              _UrgentTasksSection(
+                urgentAsync: urgentAsync,
+                onSeeAll: () => context.push(AppRoutes.actionItems),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Saate göre selamlama + günün tarihi. Kurumsal his katar.
+/// Selamlama + tarih. Solda menü butonu (drawer'ı açar).
 class _GreetingHeader extends StatelessWidget {
   const _GreetingHeader({required this.name});
 
@@ -93,29 +90,45 @@ class _GreetingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final displayName = name ?? '-';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Text(
-          '${_greeting(now.hour)},',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).hintColor,
-              ),
+        // Drawer'ı açan menü butonu. Builder şart: Scaffold.of için
+        // Scaffold'un içindeki bir context gerekiyor.
+        Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(LucideIcons.menu),
+            tooltip: 'Menü',
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          name ?? '-',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+        const SizedBox(width: 4),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_greeting(now.hour)},',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).hintColor,
+                    ),
               ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          _formatDate(now),
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).hintColor,
+              const SizedBox(height: 2),
+              Text(
+                displayName,
+                style: Theme.of(context).textTheme.titleLarge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
+              Text(
+                _formatDate(now),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).hintColor,
+                    ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -141,99 +154,6 @@ class _GreetingHeader extends StatelessWidget {
   }
 }
 
-/// Dashboard'daki bekleyen görev önizlemesi.
-/// En acil 1-2 görevi gösterir; "Tümünü gör" ile görevler ekranına geçer.
-class _UrgentTasksSection extends StatelessWidget {
-  const _UrgentTasksSection({
-    required this.urgentAsync,
-    required this.onSeeAll,
-  });
-
-  final AsyncValue<List<ActionItem>> urgentAsync;
-  final VoidCallback onSeeAll;
-
-  @override
-  Widget build(BuildContext context) {
-    return urgentAsync.when(
-      // Aksiyon verisi yüklenirken sessizce boş dur - dashboard'un asıl
-      // içeriği (KPI'lar) zaten görünüyor, burada spinner göstermeye gerek yok.
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
-      data: (tasks) {
-        // Açık görev yoksa bu bölümü hiç gösterme.
-        if (tasks.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  'Bekleyen görevler',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: onSeeAll,
-                  child: const Text('Tümünü gör'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            for (final task in tasks)
-              _UrgentTaskCard(task: task, onTap: onSeeAll),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _UrgentTaskCard extends StatelessWidget {
-  const _UrgentTaskCard({required this.task, required this.onTap});
-
-  final ActionItem task;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(
-          task.isOverdue ? Icons.warning_amber_outlined : Icons.pending_outlined,
-          color: task.isOverdue ? scheme.error : scheme.primary,
-        ),
-        title: Text(
-          task.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: task.dueDate != null
-            ? Text(
-                task.isOverdue
-                    ? 'Gecikmiş - ${_formatDate(task.dueDate!)}'
-                    : 'Son tarih: ${_formatDate(task.dueDate!)}',
-                style: TextStyle(
-                  color: task.isOverdue ? scheme.error : null,
-                ),
-              )
-            : null,
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  static String _formatDate(DateTime date) {
-    final d = date.day.toString().padLeft(2, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    return '$d.$m.${date.year}';
-  }
-}
-
 class _SummaryCards extends StatelessWidget {
   const _SummaryCards({
     required this.summary,
@@ -250,6 +170,8 @@ class _SummaryCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final hasNegativeDetail = summary.negativeTrend.isNotEmpty ||
+        summary.recurringComplaints.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -258,26 +180,22 @@ class _SummaryCards extends StatelessWidget {
           children: [
             Expanded(
               child: _KpiCard(
-                icon: Icons.today_outlined,
+                icon: LucideIcons.message_square,
+                iconColor: scheme.primary,
                 label: 'Bugünkü yorum',
                 value: '${summary.todayReviewCount}',
-                color: scheme.primaryContainer,
-                onColor: scheme.onPrimaryContainer,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _KpiCard(
-                icon: Icons.pending_actions_outlined,
+                icon: LucideIcons.clipboard_list,
+                iconColor: scheme.tertiary,
                 label: 'Açık görev',
                 value: '${summary.openActionCount}',
-                color: scheme.tertiaryContainer,
-                onColor: scheme.onTertiaryContainer,
-                // Sağ-ok: bu kart başka ekrana götürür (negatif kartın
-                // aşağı-oku ise aynı ekranda detay açar - fark kasıtlı).
                 trailing: Icon(
-                  Icons.chevron_right,
-                  color: scheme.onTertiaryContainer,
+                  LucideIcons.chevron_right,
+                  color: Theme.of(context).hintColor,
                   size: 20,
                 ),
                 onTap: onOpenActions,
@@ -290,35 +208,31 @@ class _SummaryCards extends StatelessWidget {
           children: [
             Expanded(
               child: _KpiCard(
-                icon: Icons.sentiment_dissatisfied_outlined,
+                icon: LucideIcons.frown,
+                iconColor: scheme.error,
                 label: 'Negatif yorum',
                 value: '${summary.negativeReviewCount}',
-                color: scheme.errorContainer,
-                onColor: scheme.onErrorContainer,
-                trailing: (summary.negativeTrend.isNotEmpty ||
-                        summary.recurringComplaints.isNotEmpty)
+                tinted: true,
+                tintColor: scheme.errorContainer,
+                trailing: hasNegativeDetail
                     ? Icon(
                         negativeExpanded
-                            ? Icons.expand_less
-                            : Icons.expand_more,
-                        color: scheme.onErrorContainer,
+                            ? LucideIcons.chevron_up
+                            : LucideIcons.chevron_down,
+                        color: scheme.error,
                         size: 20,
                       )
                     : null,
-                onTap: (summary.negativeTrend.isNotEmpty ||
-                        summary.recurringComplaints.isNotEmpty)
-                    ? onToggleNegative
-                    : null,
+                onTap: hasNegativeDetail ? onToggleNegative : null,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _KpiCard(
-                icon: Icons.star_outline,
+                icon: LucideIcons.star,
+                iconColor: Colors.amber.shade700,
                 label: 'Ortalama puan',
                 value: summary.averageRating?.toStringAsFixed(1) ?? '-',
-                color: scheme.secondaryContainer,
-                onColor: scheme.onSecondaryContainer,
               ),
             ),
           ],
@@ -352,8 +266,11 @@ class _NegativeDetail extends StatelessWidget {
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,11 +284,8 @@ class _NegativeDetail extends StatelessWidget {
                   _TrendBadge(rising: summary.isNegativeTrendRising!),
               ],
             ),
-            const SizedBox(height: 12),
-            _MiniBarChart(
-              data: summary.negativeTrend,
-              max: summary.maxTrendCount,
-            ),
+            const SizedBox(height: 16),
+            NegativeTrendChart(data: summary.negativeTrend),
             const SizedBox(height: 20),
           ],
           if (summary.recurringComplaints.isNotEmpty) ...[
@@ -392,69 +306,6 @@ class _NegativeDetail extends StatelessWidget {
   }
 }
 
-class _MiniBarChart extends StatelessWidget {
-  const _MiniBarChart({required this.data, required this.max});
-
-  final List<DailyNegativeCount> data;
-  final int max;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    const barAreaHeight = 90.0;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        for (final item in data)
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${item.count}',
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-                const SizedBox(height: 2),
-                SizedBox(
-                  height: barAreaHeight,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        height: max == 0
-                            ? 2
-                            : (item.count / max * barAreaHeight)
-                                .clamp(2.0, barAreaHeight),
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        decoration: BoxDecoration(
-                          color: scheme.error,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _weekday(item.date),
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).hintColor,
-                      ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  static String _weekday(DateTime date) {
-    const days = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
-    return days[date.weekday - 1];
-  }
-}
-
 class _TrendBadge extends StatelessWidget {
   const _TrendBadge({required this.rising});
 
@@ -468,7 +319,7 @@ class _TrendBadge extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          rising ? Icons.trending_up : Icons.trending_down,
+          rising ? LucideIcons.trending_up : LucideIcons.trending_down,
           size: 16,
           color: color,
         ),
@@ -496,7 +347,7 @@ class _ComplaintChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: scheme.errorContainer,
+        color: scheme.errorContainer.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -531,53 +382,68 @@ class _ComplaintChip extends StatelessWidget {
 class _KpiCard extends StatelessWidget {
   const _KpiCard({
     required this.icon,
+    required this.iconColor,
     required this.label,
     required this.value,
-    required this.color,
-    required this.onColor,
     this.trailing,
     this.onTap,
+    this.tinted = false,
+    this.tintColor,
   });
 
   final IconData icon;
+  final Color iconColor;
   final String label;
   final String value;
-  final Color color;
-  final Color onColor;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final bool tinted;
+  final Color? tintColor;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     final content = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(16),
+        color: tinted ? tintColor : scheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+        boxShadow: AppTheme.softShadow(scheme),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: onColor, size: 24),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
               const Spacer(),
               if (trailing != null) trailing!,
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             value,
-            style: Theme.of(context)
-                .textTheme
-                .headlineMedium
-                ?.copyWith(color: onColor, fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: scheme.onSurface,
+                ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
-            style:
-                Theme.of(context).textTheme.bodySmall?.copyWith(color: onColor),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).hintColor,
+                ),
           ),
         ],
       ),
@@ -587,7 +453,7 @@ class _KpiCard extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
       child: content,
     );
   }
@@ -604,12 +470,12 @@ class _WarningBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(12),
+        color: scheme.errorContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_amber_outlined, color: scheme.onErrorContainer),
+          Icon(LucideIcons.triangle_alert, color: scheme.error, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -621,6 +487,118 @@ class _WarningBanner extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _UrgentTasksSection extends StatelessWidget {
+  const _UrgentTasksSection({
+    required this.urgentAsync,
+    required this.onSeeAll,
+  });
+
+  final AsyncValue<List<ActionItem>> urgentAsync;
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return urgentAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (tasks) {
+        if (tasks.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Bekleyen görevler',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: onSeeAll,
+                  child: const Text('Tümünü gör'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            for (final task in tasks)
+              _UrgentTaskCard(task: task, onTap: onSeeAll),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _UrgentTaskCard extends StatelessWidget {
+  const _UrgentTaskCard({required this.task, required this.onTap});
+
+  final ActionItem task;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        side: BorderSide(
+          color: task.isOverdue
+              ? scheme.error.withValues(alpha: 0.3)
+              : scheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: ListTile(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        ),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (task.isOverdue ? scheme.error : scheme.primary)
+                .withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          ),
+          child: Icon(
+            task.isOverdue ? LucideIcons.triangle_alert : LucideIcons.clock,
+            color: task.isOverdue ? scheme.error : scheme.primary,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          task.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: task.dueDate != null
+            ? Text(
+                task.isOverdue
+                    ? 'Gecikmiş - ${_formatDate(task.dueDate!)}'
+                    : 'Son tarih: ${_formatDate(task.dueDate!)}',
+                style: TextStyle(
+                  color: task.isOverdue ? scheme.error : null,
+                  fontSize: 12,
+                ),
+              )
+            : null,
+        trailing:
+            Icon(LucideIcons.chevron_right, color: Theme.of(context).hintColor),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  static String _formatDate(DateTime date) {
+    final d = date.day.toString().padLeft(2, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    return '$d.$m.${date.year}';
   }
 }
 
@@ -659,13 +637,19 @@ class _SummaryError extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: 0.4),
+        ),
       ),
       child: Column(
         children: [
           Icon(
-            Icons.cloud_off_outlined,
+            LucideIcons.cloud_off,
             size: 40,
             color: Theme.of(context).colorScheme.error,
           ),

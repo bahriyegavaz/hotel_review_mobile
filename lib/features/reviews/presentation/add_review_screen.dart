@@ -2,11 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_routes.dart';
 import '../../../core/services/image_picker_service.dart';
-import '../../auth/presentation/session_controller.dart';
+import '../../../core/theme/app_theme.dart';
 import '../domain/review.dart';
 import 'add_review_controller.dart';
 import 'review_providers.dart';
@@ -69,7 +71,7 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt_outlined),
+              leading: const Icon(LucideIcons.camera),
               title: const Text('Kamera'),
               onTap: () {
                 Navigator.pop(sheetContext);
@@ -77,7 +79,7 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
+              leading: const Icon(LucideIcons.images),
               title: const Text('Galeri'),
               onTap: () {
                 Navigator.pop(sheetContext);
@@ -106,9 +108,7 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
           NewReview(
             comment: _commentController.text.trim(),
             rating: _rating,
-            guestName: _guestNameController.text.trim().isEmpty
-                ? null
-                : _guestNameController.text.trim(),
+            guestName: _guestNameController.text.trim(),
             photoPath: _photoPath,
           ),
         );
@@ -118,7 +118,6 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(addReviewControllerProvider);
     final isSubmitting = state is AddReviewSubmitting;
-    final isGuest = ref.watch(isGuestProvider);
 
     ref.listen<AddReviewState>(addReviewControllerProvider, (previous, next) {
       if (next is AddReviewFailed) {
@@ -145,11 +144,7 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
 
         // Yorum kaydedildikten sonra kullanıcıya AI analizi GÖSTERMİYORUZ.
         // "Yorumunuz olumsuz bulundu" demek anlamsız - analiz yöneticiler için.
-        if (isGuest) {
-          // Misafir gönderince login ekranına döner (exitGuest -> router).
-          ref.read(sessionControllerProvider.notifier).exitGuest();
-        } else if (context.canPop()) {
-          // Personel bir önceki ekrana (dashboard) döner.
+        if (context.canPop()) {
           context.pop();
         }
       }
@@ -157,19 +152,17 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isGuest ? 'Yorum Bırak' : 'Yeni Yorum'),
-        // Misafirde de geri ok'u olsun - göndermeden vazgeçip login'e dönebilsin.
-        // Router'ın altında Navigator olmadığı için (misafir tek ekran),
-        // geri ok'unu elle koyup exitGuest'e bağlıyoruz.
-        leading: isGuest
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: isSubmitting
-                    ? null
-                    : () =>
-                        ref.read(sessionControllerProvider.notifier).exitGuest(),
-              )
-            : null,
+        title: const Text('Yeni Yorum'),
+        leading: IconButton(
+          icon: const Icon(LucideIcons.arrow_left),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.dashboard);
+            }
+          },
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -179,14 +172,6 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (isGuest) ...[
-                  Text(
-                    'Deneyiminizi bizimle paylaşın',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 16),
-                ],
                 Text('Puan', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 _StarRating(
@@ -211,13 +196,21 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _guestNameController,
+                  textCapitalization: TextCapitalization.words,
                   enabled: !isSubmitting,
-                  decoration: InputDecoration(
-                    labelText: isGuest
-                        ? 'Adınız (opsiyonel)'
-                        : 'Misafir adı (opsiyonel)',
+                  decoration: const InputDecoration(
+                    labelText: 'İsim Soyisim ',
                   ),
+                  validator: (value) {
+                    final name = value?.trim() ?? '';
+                    if (name.isEmpty) return "İsim zorunludur.";
+                    if (name.isNotEmpty && name.length < 2) {
+                      return 'İsim en az 2 karakter olmalıdır.';
+                    }
+                    return null;
+                  },
                 ),
+
                 const SizedBox(height: 24),
                 _PhotoPicker(
                   photoPath: _photoPath,
@@ -270,12 +263,18 @@ class _StarRating extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(5, (index) {
         final value = index + 1;
+        final selected = value <= rating;
         return IconButton(
           iconSize: 40,
           onPressed: enabled ? () => onChanged(value) : null,
-          icon: Icon(
-            value <= rating ? Icons.star : Icons.star_border,
-            color: value <= rating ? Colors.amber : null,
+          icon: AnimatedScale(
+            scale: selected ? 1.0 : 0.86,
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            child: Icon(
+              selected ? Icons.star : Icons.star_border,
+              color: selected ? Colors.amber : null,
+            ),
           ),
         );
       }),
@@ -301,7 +300,7 @@ class _PhotoPicker extends StatelessWidget {
     if (photoPath == null) {
       return OutlinedButton.icon(
         onPressed: enabled ? onPick : null,
-        icon: const Icon(Icons.add_a_photo_outlined),
+        icon: const Icon(LucideIcons.image_plus),
         label: const Text('Fotoğraf ekle (opsiyonel)'),
       );
     }
@@ -310,7 +309,7 @@ class _PhotoPicker extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
           child: Image.file(
             File(photoPath!),
             height: 200,
@@ -326,7 +325,7 @@ class _PhotoPicker extends StatelessWidget {
         const SizedBox(height: 8),
         TextButton.icon(
           onPressed: enabled ? onRemove : null,
-          icon: const Icon(Icons.delete_outline),
+          icon: const Icon(LucideIcons.trash_2),
           label: const Text('Fotoğrafı kaldır'),
         ),
       ],

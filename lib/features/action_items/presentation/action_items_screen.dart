@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widget/app_drawer.dart';
+import '../../../core/widget/empty_state.dart';
+import '../../../core/widget/loading_skeleton.dart';
 import '../domain/action_item.dart';
 import '../domain/action_item_repository.dart';
 import 'action_item_providers.dart';
@@ -15,6 +20,7 @@ class ActionItemsScreen extends ConsumerWidget {
     final filter = ref.watch(actionFilterProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(title: const Text('Görevlerim')),
       body: Column(
         children: [
@@ -26,7 +32,7 @@ class ActionItemsScreen extends ConsumerWidget {
           const Divider(height: 1),
           Expanded(
             child: itemsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const ListSkeleton(),
               error: (error, _) => _ErrorView(
                 // Domain hatalarımızın hepsinde message var.
                 message: error is ActionItemFailure
@@ -126,7 +132,7 @@ class _ActionItemCard extends ConsumerWidget {
                 leading: Icon(_statusIcon(status)),
                 title: Text(status.label),
                 trailing: item.status == status
-                    ? const Icon(Icons.check, size: 20)
+                    ? const Icon(LucideIcons.check, size: 20)
                     : null,
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -148,7 +154,7 @@ class _ActionItemCard extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         onTap: () => _showStatusSheet(context, ref),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -185,7 +191,7 @@ class _ActionItemCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      Icons.lightbulb_outline,
+                      LucideIcons.lightbulb,
                       size: 16,
                       color: theme.colorScheme.primary,
                     ),
@@ -205,13 +211,13 @@ class _ActionItemCard extends ConsumerWidget {
                 runSpacing: 4,
                 children: [
                   _MetaChip(
-                    icon: Icons.person_outline,
+                    icon: LucideIcons.user,
                     // Atama Angular'dan yapılır - burada salt okunur.
                     text: item.assignedToName ?? 'Atanmamış',
                   ),
                   if (item.dueDate != null)
                     _MetaChip(
-                      icon: Icons.event_outlined,
+                      icon: LucideIcons.calendar,
                       text: _formatDate(item.dueDate!),
                       color: item.isOverdue ? theme.colorScheme.error : null,
                     ),
@@ -231,11 +237,11 @@ class _ActionItemCard extends ConsumerWidget {
   }
 
   static IconData _statusIcon(ActionStatus status) => switch (status) {
-        ActionStatus.open => Icons.radio_button_unchecked,
-        ActionStatus.inProgress => Icons.timelapse,
-        ActionStatus.resolved => Icons.check_circle_outline,
-        ActionStatus.rejected => Icons.cancel_outlined,
-        ActionStatus.unknown => Icons.help_outline,
+        ActionStatus.open => LucideIcons.circle,
+        ActionStatus.inProgress => LucideIcons.clock,
+        ActionStatus.resolved => LucideIcons.circle_check,
+        ActionStatus.rejected => LucideIcons.circle_x,
+        ActionStatus.unknown => LucideIcons.circle_question_mark,
       };
 }
 
@@ -310,20 +316,18 @@ class _MetaChip extends StatelessWidget {
   }
 }
 
+/// Filtreye göre görev olmadığında gösterilir.
+/// EmptyState kendi ikonunu, başlığını ve boşluğunu çiziyor - dışına
+/// ekstra Column/Icon koymuyoruz.
 class _EmptyView extends StatelessWidget {
   const _EmptyView();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.task_alt, size: 56, color: Theme.of(context).hintColor),
-          const SizedBox(height: 12),
-          const Text('Görev bulunamadı.'),
-        ],
-      ),
+    return const EmptyState(
+      icon: Icons.check_circle_outline,
+      title: 'Görev yok',
+      message: 'Şu an bekleyen bir göreviniz bulunmuyor.',
     );
   }
 }
@@ -343,7 +347,7 @@ class _ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.error_outline,
+              LucideIcons.circle_alert,
               size: 56,
               color: Theme.of(context).colorScheme.error,
             ),

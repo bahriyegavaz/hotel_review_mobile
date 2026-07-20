@@ -7,15 +7,22 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/session_controller.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
+import '../../features/hotels/presentation/hotel_providers.dart';
+import '../../features/hotels/presentation/hotel_selection_screen.dart';
 import '../../features/reviews/presentation/add_review_screen.dart';
+import '../../features/reviews/presentation/reviews_list_screen.dart';
 import 'app_routes.dart';
 
-/// go_router `refreshListenable` bir Listenable bekler, oturum ise Riverpod'da.
+/// Hem oturumu hem otel seçimini dinler; biri değişince router yeniden değerlendirir.
 class _RouterRefreshNotifier extends ChangeNotifier {
   _RouterRefreshNotifier(Ref ref) {
     ref.listen<SessionState>(
       sessionControllerProvider,
-      (_, __) => notifyListeners(),
+      (_, _) => notifyListeners(),
+    );
+    ref.listen<HotelSelectionState>(
+      selectedHotelProvider,
+      (_, _) => notifyListeners(),
     );
   }
 }
@@ -28,35 +35,46 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: AppRoutes.splash,
     refreshListenable: refreshNotifier,
 
-    /// Tüm yetkilendirme mantığı burada. Ekranlar bunu düşünmez.
-    ///
-    /// Misafir kısıtlaması da burada uygulanıyor - yorum ekleme dışında
-    /// bir yere gitmeye çalışırsa geri atılır. Ekranlarda tek tek
-    /// "bu kullanıcı misafir mi" kontrolü yapmıyoruz.
+    /// İki sıralı kapı:
+    ///   1. Giriş yapıldı mı?
+    ///   2. Otel seçildi mi?
+    /// İkisi de cihazda saklı; açılışta okunurken splash gösterilir.
     redirect: (context, state) {
       final session = ref.read(sessionControllerProvider);
+      final hotel = ref.read(selectedHotelProvider);
       final location = state.matchedLocation;
 
-      return switch (session) {
-        // Token okunuyor - splash'te bekle.
-        SessionUnknown() =>
-          location == AppRoutes.splash ? null : AppRoutes.splash,
+      // Oturum okunuyor - bekle.
+      if (session is SessionUnknown) {
+        return location == AppRoutes.splash ? null : AppRoutes.splash;
+      }
 
-        // Giriş yapılmamış - login dışında hiçbir yere gidemez.
-        SessionUnauthenticated() =>
-          location == AppRoutes.login ? null : AppRoutes.login,
+      // Giriş yok - login dışına çıkamaz.
+      if (session is SessionUnauthenticated) {
+        return location == AppRoutes.login ? null : AppRoutes.login;
+      }
 
-        // Misafir - SADECE yorum ekleme ekranı.
-        // Dashboard, görevler, KPI'lar ona kapalı.
-        SessionGuest() =>
-          location == AppRoutes.addReview ? null : AppRoutes.addReview,
+      // Buradan sonrası: giriş yapılmış.
+      // Otel seçimi okunuyor - bekle.
+      if (hotel is HotelUnknown) {
+        return location == AppRoutes.splash ? null : AppRoutes.splash;
+      }
 
-        // Personel - login/splash'te takılı kalmasın.
-        SessionAuthenticated() =>
-          (location == AppRoutes.login || location == AppRoutes.splash)
-              ? AppRoutes.dashboard
-              : null,
-      };
+      // Otel seçilmemiş - seçim ekranına.
+      if (hotel is HotelNotSelected) {
+        return location == AppRoutes.hotelSelection
+            ? null
+            : AppRoutes.hotelSelection;
+      }
+
+      // Giriş + otel tamam: login/splash/otel seçiminde takılı kalmasın.
+      if (location == AppRoutes.login ||
+          location == AppRoutes.splash ||
+          location == AppRoutes.hotelSelection) {
+        return AppRoutes.dashboard;
+      }
+
+      return null;
     },
     routes: [
       GoRoute(
@@ -66,6 +84,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.login,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hotelSelection,
+        builder: (context, state) => const HotelSelectionScreen(),
       ),
       GoRoute(
         path: AppRoutes.dashboard,
@@ -78,6 +100,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.actionItems,
         builder: (context, state) => const ActionItemsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.reviews,
+        builder: (context, state) => const ReviewsListScreen(),
       ),
     ],
   );

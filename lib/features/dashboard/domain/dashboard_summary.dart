@@ -5,6 +5,7 @@
 ///   - "Son 7 günde temizlik şikayetleri %24 arttı"
 ///   - "En çok geçen negatif kelimeler: banyo, havlu, koku"
 /// Negatif detayı bu iki veriyi gösterir
+library;
 
 /// Bir günün negatif yorum sayısı - trend grafiği için.
 class DailyNegativeCount {

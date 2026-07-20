@@ -7,6 +7,7 @@ import 'package:hotel_review_mobile/features/action_items/domain/action_item_rep
 import 'package:hotel_review_mobile/features/action_items/presentation/action_item_providers.dart';
 import 'package:hotel_review_mobile/features/action_items/presentation/action_items_screen.dart';
 import 'package:hotel_review_mobile/features/auth/presentation/auth_providers.dart';
+import 'package:hotel_review_mobile/core/widget/loading_skeleton.dart';
 
 import '../../helpers/pump_app.dart';
 import '../../helpers/stub_auth_repository.dart';
@@ -57,10 +58,9 @@ void main() {
       );
 
       // pumpAndSettle çağırmıyoruz - henüz yükleniyor durumundayız.
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-
+      expect(find.byType(ListSkeleton), findsOneWidget);
       await tester.pumpAndSettle();
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(ListSkeleton), findsNothing);
     });
 
     testWidgets('görevler yüklendiğinde kartlar listelenir', (tester) async {
@@ -95,7 +95,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Görev bulunamadı.'), findsOneWidget);
+      expect(find.text('Görev yok'), findsOneWidget);
     });
 
     testWidgets('yükleme hatasında hata ekranı ve tekrar dene butonu çıkar',

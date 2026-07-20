@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_controller.dart';
-import 'session_controller.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -34,18 +34,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
   }
 
-  /// Router bunu görüp yorum ekleme ekranına yönlendirir.
-  void _continueAsGuest() {
-    ref.read(sessionControllerProvider.notifier).continueAsGuest();
-  }
-
   @override
   Widget build(BuildContext context) {
     final loginState = ref.watch(authControllerProvider);
     final isLoading = loginState is LoginInProgress;
 
-    // Yan etki: hata mesajını SnackBar ile göster.
-    // Başarı durumunda yönlendirme YAPMIYORUZ - router halleder.
     ref.listen<LoginState>(authControllerProvider, (previous, next) {
       if (next is LoginFailed) {
         ScaffoldMessenger.of(context)
@@ -72,18 +65,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.reviews_outlined,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 16),
+                    const _Logo(),
+                    const SizedBox(height: 24),
                     Text(
                       'Yorum Analiz Sistemi',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       'Devam etmek için giriş yapın',
                       textAlign: TextAlign.center,
@@ -91,7 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             color: Theme.of(context).hintColor,
                           ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 36),
                     TextFormField(
                       controller: _emailController,
                       enabled: !isLoading,
@@ -100,7 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       autofillHints: const [AutofillHints.email],
                       decoration: const InputDecoration(
                         labelText: 'E-posta',
-                        prefixIcon: Icon(Icons.mail_outline),
+                        prefixIcon: Icon(LucideIcons.mail, size: 20),
                       ),
                       validator: (value) {
                         final email = value?.trim() ?? '';
@@ -121,12 +110,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       onFieldSubmitted: (_) => _submit(),
                       decoration: InputDecoration(
                         labelText: 'Şifre',
-                        prefixIcon: const Icon(Icons.lock_outline),
+                        prefixIcon: const Icon(LucideIcons.lock, size: 20),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                            _obscurePassword ? LucideIcons.eye : LucideIcons.eye_off,
+                            size: 20,
                           ),
                           onPressed: () => setState(
                             () => _obscurePassword = !_obscurePassword,
@@ -143,59 +131,57 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 28),
                     FilledButton(
                       onPressed: isLoading ? null : _submit,
                       child: isLoading
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
                             )
                           : const Text('Giriş Yap'),
-                    ),
-                    const SizedBox(height: 16),
-                    // Ayırıcı - iki farklı yolu görsel olarak ayırıyor.
-                    Row(
-                      children: [
-                        const Expanded(child: Divider()),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            'veya',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                        const Expanded(child: Divider()),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      onPressed: isLoading ? null : _continueAsGuest,
-                      icon: const Icon(Icons.rate_review_outlined),
-                      label: const Text('Misafir olarak yorum bırak'),
-                    ),
-                    const SizedBox(height: 24),
-                    // Fake repository kullanılırken faydalı.
-                    // Gerçek backend'e geçince silinecek.
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Demo: admin@hotel.com / 123456\n'
-                        'Ağ hatası testi: timeout@hotel.com',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
                     ),
                   ],
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Uygulama logosu. Yumuşak tonlu bir arka planın üzerinde, yuvarlak köşeli.
+class _Logo extends StatelessWidget {
+  const _Logo();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: scheme.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Image.asset(
+            'assets/images/logo.png',
+            height: 96,
+            width: 96,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Icon(
+              LucideIcons.message_square_text,
+              size: 56,
+              color: scheme.primary,
             ),
           ),
         ),
