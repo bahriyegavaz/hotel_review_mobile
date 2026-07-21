@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/domain/user.dart';
 import '../../features/auth/presentation/session_controller.dart';
 import '../router/app_routes.dart';
 
 /// Soldan açılan gezinme menüsü. Tüm ekranlara buradan ulaşılır.
 ///
-/// Üstte kullanıcı, ortada gezinme, altta çıkış.
-/// Otel değiştirme buradan KALDIRILDI - artık sadece dashboard hero'daki
-/// "İşletme" pill'inden yapılıyor. Tek yerden yönetim, sade menü.
+/// Rol bazlı görünüm:
+///   - Yorumlar: sadece Admin ve Manager görür. Departman personeli
+///     kendi görevlerine odaklanır (rapor bölüm 11), yorum listesi
+///     yönetici perspektifi.
+///   - Diğer öğeler herkese açık.
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
 
@@ -18,6 +21,10 @@ class AppDrawer extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final scheme = Theme.of(context).colorScheme;
     final currentLocation = GoRouterState.of(context).matchedLocation;
+
+    // Yorumlar menüsü sadece yönetici rollerine görünür.
+    final canSeeReviews =
+        user?.role == UserRole.admin || user?.role == UserRole.manager;
 
     return Drawer(
       child: SafeArea(
@@ -75,7 +82,7 @@ class AppDrawer extends ConsumerWidget {
             ),
             const Divider(height: 1),
             const SizedBox(height: 8),
-            // --- Gezinme: Ana Sayfa -> Görevler -> Yorumlar -> Yorum Ekle ---
+            // --- Gezinme ---
             _DrawerItem(
               icon: Icons.home_outlined,
               label: 'Ana Sayfa',
@@ -88,12 +95,13 @@ class AppDrawer extends ConsumerWidget {
               selected: currentLocation == AppRoutes.actionItems,
               onTap: () => _go(context, AppRoutes.actionItems),
             ),
-            _DrawerItem(
-              icon: Icons.reviews_outlined,
-              label: 'Yorumlar',
-              selected: currentLocation == AppRoutes.reviews,
-              onTap: () => _go(context, AppRoutes.reviews),
-            ),
+            if (canSeeReviews)
+              _DrawerItem(
+                icon: Icons.reviews_outlined,
+                label: 'Yorumlar',
+                selected: currentLocation == AppRoutes.reviews,
+                onTap: () => _go(context, AppRoutes.reviews),
+              ),
             _DrawerItem(
               icon: Icons.add_comment_outlined,
               label: 'Yorum Ekle',

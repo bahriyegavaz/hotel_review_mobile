@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widget/app_drawer.dart';
@@ -11,13 +10,23 @@ import 'review_providers.dart';
 
 /// Kullanıcının gönderdiği yorumları listeler.
 ///
-/// Salt okunur - buradan yorum düzenlenmez/silinmez (rapor bölüm 11 mobil
-/// için sadece ekleme + listeleme istiyor). Yeni yorum "Yorum Ekle"den.
-class ReviewsListScreen extends ConsumerWidget {
+/// Üstte kategori filtresi: yorumlar AI analizindeki kategoriye göre
+/// süzülebilir (Temizlik, Yemek, Personel...). Kategoriler ayrı bir
+/// endpoint'ten değil, GELEN YORUMLARDAN türetiliyor - böylece boş
+/// kategori görünmez ve ekstra istek gerekmez.
+class ReviewsListScreen extends ConsumerStatefulWidget {
   const ReviewsListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReviewsListScreen> createState() => _ReviewsListScreenState();
+}
+
+class _ReviewsListScreenState extends ConsumerState<ReviewsListScreen> {
+  /// Seçili kategori. null = Tümü.
+  String? _selectedCategory;
+
+  @override
+  Widget build(BuildContext context) {
     final reviewsAsync = ref.watch(myReviewsProvider);
 
     return Scaffold(
@@ -31,21 +40,101 @@ class ReviewsListScreen extends ConsumerWidget {
               : 'Yorumlar yüklenemedi.',
           onRetry: () => ref.invalidate(myReviewsProvider),
         ),
-        data: (reviews) => reviews.isEmpty
-            ? const EmptyState(
-                icon: LucideIcons.message_square_text,
-                title: 'Henüz yorum yok',
-                message: 'Eklenen yorumlar burada listelenecek.',
-              )
-            : RefreshIndicator(
-                onRefresh: () async => ref.invalidate(myReviewsProvider),
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: reviews.length,
-                  itemBuilder: (context, index) =>
-                      _ReviewCard(review: reviews[index]),
+        data: (reviews) {
+          if (reviews.isEmpty) {
+            return const EmptyState(
+              icon: Icons.rate_review_outlined,
+              title: 'Henüz yorum yok',
+              message: 'Eklenen yorumlar burada listelenecek.',
+            );
+          }
+
+          // Kategorileri yorumlardan türet (analizsiz yorumlar hariç).
+          final categories = reviews
+              .map((r) => r.analysis?.category)
+              .whereType<String>()
+              .toSet()
+              .toList()
+            ..sort();
+
+          // Seçili kategoriye göre süz. null = hepsi.
+          final filtered = _selectedCategory == null
+              ? reviews
+              : reviews
+                  .where((r) => r.analysis?.category == _selectedCategory)
+                  .toList();
+
+          return Column(
+            children: [
+              if (categories.isNotEmpty)
+                _CategoryFilter(
+                  categories: categories,
+                  selected: _selectedCategory,
+                  onChanged: (value) =>
+                      setState(() => _selectedCategory = value),
                 ),
+              const Divider(height: 1),
+              Expanded(
+                child: filtered.isEmpty
+                    ? EmptyState(
+                        icon: Icons.filter_alt_outlined,
+                        title: 'Bu kategoride yorum yok',
+                        message:
+                            '$_selectedCategory kategorisinde yorum bulunamadı.',
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () async =>
+                            ref.invalidate(myReviewsProvider),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) =>
+                              _ReviewCard(review: filtered[index]),
+                        ),
+                      ),
               ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Üstteki yatay kategori filtresi. "Tümü" + yorumlardan türeyen kategoriler.
+class _CategoryFilter extends StatelessWidget {
+  const _CategoryFilter({
+    required this.categories,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final List<String> categories;
+  final String? selected;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          ChoiceChip(
+            label: const Text('Tümü'),
+            selected: selected == null,
+            onSelected: (_) => onChanged(null),
+          ),
+          const SizedBox(width: 8),
+          for (final category in categories) ...[
+            ChoiceChip(
+              label: Text(category),
+              selected: selected == category,
+              onSelected: (_) => onChanged(category),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ],
       ),
     );
   }
@@ -67,7 +156,6 @@ class _ReviewCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Üst satır: yıldızlar + analiz rozeti
             Row(
               children: [
                 _StarRow(rating: review.rating),
@@ -77,18 +165,16 @@ class _ReviewCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            // Yorum metni
             Text(
               review.comment,
               style: theme.textTheme.bodyMedium,
             ),
-            // Kategori (analiz varsa)
             if (review.analysis != null) ...[
               const SizedBox(height: 10),
               Row(
                 children: [
                   Icon(
-                    LucideIcons.tag,
+                    Icons.label_outline,
                     size: 14,
                     color: theme.hintColor,
                   ),
@@ -105,10 +191,9 @@ class _ReviewCard extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(height: 1),
             const SizedBox(height: 10),
-            // Alt satır: misafir adı + tarih
             Row(
               children: [
-                Icon(LucideIcons.user, size: 14, color: theme.hintColor),
+                Icon(Icons.person_outline, size: 14, color: theme.hintColor),
                 const SizedBox(width: 4),
                 Text(
                   review.guestName ?? 'İsimsiz',
@@ -117,7 +202,7 @@ class _ReviewCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                Icon(LucideIcons.calendar, size: 14, color: theme.hintColor),
+                Icon(Icons.schedule, size: 14, color: theme.hintColor),
                 const SizedBox(width: 4),
                 Text(
                   _formatDate(review.reviewDate),
@@ -140,7 +225,6 @@ class _ReviewCard extends StatelessWidget {
   }
 }
 
-/// Puanı yıldızlarla gösterir.
 class _StarRow extends StatelessWidget {
   const _StarRow({required this.rating});
 
@@ -162,7 +246,6 @@ class _StarRow extends StatelessWidget {
   }
 }
 
-/// Analiz duygu durumunu renkli rozet olarak gösterir.
 class _SentimentBadge extends StatelessWidget {
   const _SentimentBadge({required this.sentiment});
 
@@ -176,22 +259,22 @@ class _SentimentBadge extends StatelessWidget {
       Sentiment.positive => (
           scheme.primaryContainer,
           scheme.onPrimaryContainer,
-          LucideIcons.smile,
+          Icons.sentiment_satisfied_outlined,
         ),
       Sentiment.negative => (
           scheme.errorContainer,
           scheme.onErrorContainer,
-          LucideIcons.frown,
+          Icons.sentiment_dissatisfied_outlined,
         ),
       Sentiment.neutral => (
           scheme.surfaceContainerHighest,
           scheme.onSurface,
-          LucideIcons.meh,
+          Icons.sentiment_neutral_outlined,
         ),
       Sentiment.unknown => (
           scheme.surfaceContainerHighest,
           scheme.onSurface,
-          LucideIcons.circle_question_mark,
+          Icons.help_outline,
         ),
     };
 
@@ -234,7 +317,7 @@ class _ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              LucideIcons.circle_alert,
+              Icons.error_outline,
               size: 56,
               color: Theme.of(context).colorScheme.error,
             ),

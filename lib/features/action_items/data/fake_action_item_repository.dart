@@ -54,6 +54,25 @@ class FakeActionItemRepository implements ActionItemRepository {
         assignedToName: 'Demo Müdür',
         reviewComment: 'Kahvaltıda çeşit azdı.',
       ),
+      ActionItem(
+        id: '5',
+        title: 'Kahvaltı büfesi ekipman kontrolü',
+        status: ActionStatus.open,
+        departmentId: '20',
+        assignedToName: 'Mutfak Ekibi',
+        dueDate: DateTime.now().add(const Duration(days: 2)),
+        reviewComment: 'Kahvaltıda sıcak yemekler soğuktu.',
+        suggestion: 'Benmari ısıtıcıları kontrol edilmeli.',
+      ),
+      ActionItem(
+        id: '6',
+        title: 'Menü alerjen etiketleri güncellensin',
+        status: ActionStatus.inProgress,
+        departmentId: '20',
+        assignedToName: 'Mutfak Ekibi',
+        dueDate: DateTime.now().add(const Duration(days: 5)),
+        suggestion: 'Alerjen bilgisi eksik ürünler işaretlenmeli.',
+      ), 
     ];
   }
 

@@ -2,13 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_routes.dart';
 import '../../../core/services/image_picker_service.dart';
-import '../../../core/theme/app_theme.dart';
 import '../domain/review.dart';
 import 'add_review_controller.dart';
 import 'review_providers.dart';
@@ -42,6 +40,12 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
       if (path != null && mounted) {
         setState(() => _photoPath = path);
       }
+    } on PhotoValidationException catch (e) {
+      // 5 MB / uzantı doğrulaması başarısız (madde 6.1) - net mesaj göster,
+      // fotoğraf eklenmez.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on PlatformException catch (e) {
       if (!mounted) return;
       // İzin reddi ile genel hatayı ayırıyoruz - kullanıcı ne yapacağını bilsin.
@@ -71,7 +75,7 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(LucideIcons.camera),
+              leading: const Icon(Icons.camera_alt_outlined),
               title: const Text('Kamera'),
               onTap: () {
                 Navigator.pop(sheetContext);
@@ -79,7 +83,7 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(LucideIcons.images),
+              leading: const Icon(Icons.photo_library_outlined),
               title: const Text('Galeri'),
               onTap: () {
                 Navigator.pop(sheetContext);
@@ -108,7 +112,9 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
           NewReview(
             comment: _commentController.text.trim(),
             rating: _rating,
-            guestName: _guestNameController.text.trim(),
+            guestName: _guestNameController.text.trim().isEmpty
+                ? null
+                : _guestNameController.text.trim(),
             photoPath: _photoPath,
           ),
         );
@@ -146,6 +152,8 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
         // "Yorumunuz olumsuz bulundu" demek anlamsız - analiz yöneticiler için.
         if (context.canPop()) {
           context.pop();
+        } else {
+          context.go(AppRoutes.dashboard);
         }
       }
     });
@@ -153,8 +161,11 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Yeni Yorum'),
+        // Geri butonu: nereden gelinirse gelinsin çalışsın. Dashboard FAB'ından
+        // push ile gelince Flutter otomatik ok koyar, drawer'dan go ile gelince
+        // geçmiş sıfırlandığı için elle koyup dashboard'a yönlendiriyoruz.
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrow_left),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -196,21 +207,18 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _guestNameController,
-                  textCapitalization: TextCapitalization.words,
                   enabled: !isSubmitting,
+                  textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
-                    labelText: 'İsim Soyisim ',
+                    labelText: 'Misafir adı',
                   ),
                   validator: (value) {
                     final name = value?.trim() ?? '';
-                    if (name.isEmpty) return "İsim zorunludur.";
-                    if (name.isNotEmpty && name.length < 2) {
-                      return 'İsim en az 2 karakter olmalıdır.';
-                    }
+                    if (name.isEmpty) return 'Misafir adı zorunludur.';
+                    if (name.length < 2) return 'Geçerli bir isim giriniz.';
                     return null;
                   },
                 ),
-
                 const SizedBox(height: 24),
                 _PhotoPicker(
                   photoPath: _photoPath,
@@ -263,18 +271,12 @@ class _StarRating extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(5, (index) {
         final value = index + 1;
-        final selected = value <= rating;
         return IconButton(
           iconSize: 40,
           onPressed: enabled ? () => onChanged(value) : null,
-          icon: AnimatedScale(
-            scale: selected ? 1.0 : 0.86,
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOut,
-            child: Icon(
-              selected ? Icons.star : Icons.star_border,
-              color: selected ? Colors.amber : null,
-            ),
+          icon: Icon(
+            value <= rating ? Icons.star : Icons.star_border,
+            color: value <= rating ? Colors.amber : null,
           ),
         );
       }),
@@ -300,7 +302,7 @@ class _PhotoPicker extends StatelessWidget {
     if (photoPath == null) {
       return OutlinedButton.icon(
         onPressed: enabled ? onPick : null,
-        icon: const Icon(LucideIcons.image_plus),
+        icon: const Icon(Icons.add_a_photo_outlined),
         label: const Text('Fotoğraf ekle (opsiyonel)'),
       );
     }
@@ -309,7 +311,7 @@ class _PhotoPicker extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          borderRadius: BorderRadius.circular(12),
           child: Image.file(
             File(photoPath!),
             height: 200,
@@ -325,7 +327,7 @@ class _PhotoPicker extends StatelessWidget {
         const SizedBox(height: 8),
         TextButton.icon(
           onPressed: enabled ? onRemove : null,
-          icon: const Icon(LucideIcons.trash_2),
+          icon: const Icon(Icons.delete_outline),
           label: const Text('Fotoğrafı kaldır'),
         ),
       ],

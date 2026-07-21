@@ -44,6 +44,7 @@ dependencies:
   fl_chart: ^1.2.0
   flutter_lucide: ^1.11.0
   google_fonts: ^6.3.3
+  jwt_decoder: ^2.0.1
 
 dev_dependencies:
   flutter_test:

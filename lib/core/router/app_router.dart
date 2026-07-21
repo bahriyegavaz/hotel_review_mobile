@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/action_items/presentation/action_items_screen.dart';
+import '../../features/auth/domain/user.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/session_controller.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -35,10 +36,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: AppRoutes.splash,
     refreshListenable: refreshNotifier,
 
-    /// İki sıralı kapı:
+    /// Sıralı kapılar:
     ///   1. Giriş yapıldı mı?
     ///   2. Otel seçildi mi?
-    /// İkisi de cihazda saklı; açılışta okunurken splash gösterilir.
+    ///   3. Rol bu ekranı görebilir mi? (Yorumlar -> sadece admin/manager)
     redirect: (context, state) {
       final session = ref.read(sessionControllerProvider);
       final hotel = ref.read(selectedHotelProvider);
@@ -55,6 +56,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // Buradan sonrası: giriş yapılmış.
+      final user = (session as SessionAuthenticated).user;
+
       // Otel seçimi okunuyor - bekle.
       if (hotel is HotelUnknown) {
         return location == AppRoutes.splash ? null : AppRoutes.splash;
@@ -65,6 +68,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         return location == AppRoutes.hotelSelection
             ? null
             : AppRoutes.hotelSelection;
+      }
+
+      // Rol koruması: Yorumlar sadece admin/manager.
+      // Drawer'da gizli ama doğrudan yönlendirme denenirse burada kesilir.
+      final canSeeReviews =
+          user.role == UserRole.admin || user.role == UserRole.manager;
+      if (location == AppRoutes.reviews && !canSeeReviews) {
+        return AppRoutes.dashboard;
       }
 
       // Giriş + otel tamam: login/splash/otel seçiminde takılı kalmasın.
@@ -94,16 +105,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const DashboardScreen(),
       ),
       GoRoute(
+        path: AppRoutes.reviews,
+        builder: (context, state) => const ReviewsListScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.addReview,
         builder: (context, state) => const AddReviewScreen(),
       ),
       GoRoute(
         path: AppRoutes.actionItems,
         builder: (context, state) => const ActionItemsScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.reviews,
-        builder: (context, state) => const ReviewsListScreen(),
       ),
     ],
   );

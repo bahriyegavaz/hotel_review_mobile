@@ -17,8 +17,6 @@ enum UserRole {
         return UserRole.manager;
       case 'departmentuser':
         return UserRole.departmentUser;
-      case 'mobileuser':
-        return UserRole.mobileUser;
       default:
         return UserRole.unknown;
     }

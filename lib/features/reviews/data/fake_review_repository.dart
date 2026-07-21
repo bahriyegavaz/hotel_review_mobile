@@ -9,7 +9,100 @@ import '../domain/review_repository.dart';
 ///   Yorum içinde "hata" kelimesi geçerse ReviewNetworkFailure fırlatır.
 class FakeReviewRepository implements ReviewRepository {
   // Uygulama açık kaldığı sürece yaşayan sahte veritabanı.
-  final List<Review> _reviews = [];
+  final List<Review> _reviews = [
+     Review(
+      id: 'seed-1',
+      comment:
+          'Oda çok temizdi, personel son derece ilgiliydi. Kahvaltı '
+          'zengindi, kesinlikle tekrar geleceğiz.',
+      rating: 5,
+      source: ReviewSource.mobile,
+      reviewDate: DateTime.now().subtract(const Duration(hours: 3)),
+      guestName: 'Ayşe Yılmaz',
+      analysis: const ReviewAnalysis(
+        sentiment: Sentiment.positive,
+        sentimentScore: 0.8,
+        category: 'Personel',
+        keywords: ['temiz', 'ilgi', 'kahvaltı'],
+        summary: 'Misafir Personel kategorisinde olumlu geri bildirim verdi.',
+        confidence: 0.7,
+      ),
+    ),
+    Review(
+      id: 'seed-2',
+      comment:
+          'Banyoda koku vardı ve havlular değiştirilmemişti. '
+          'Temizlik konusunda sıkıntı yaşadık.',
+      rating: 2,
+      source: ReviewSource.mobile,
+      reviewDate: DateTime.now().subtract(const Duration(days: 1)),
+      guestName: 'Mehmet Demir',
+      analysis: const ReviewAnalysis(
+        sentiment: Sentiment.negative,
+        sentimentScore: -0.7,
+        category: 'Temizlik',
+        keywords: ['banyo', 'koku', 'havlu'],
+        summary: 'Misafir Temizlik kategorisinde olumsuz geri bildirim verdi.',
+        suggestion:
+            'Temizlik ile ilgili departman kontrol listesi gözden geçirilmeli.',
+        confidence: 0.68,
+      ),
+    ),
+    Review(
+      id: 'seed-3',
+      comment:
+          'Konum güzeldi ama oda beklediğimden küçüktü. Fiyata göre ortalama.',
+      rating: 3,
+      source: ReviewSource.mobile,
+      reviewDate: DateTime.now().subtract(const Duration(days: 2)),
+      guestName: 'Zeynep Kaya',
+      analysis: const ReviewAnalysis(
+        sentiment: Sentiment.neutral,
+        sentimentScore: 0.0,
+        category: 'Oda',
+        keywords: ['oda', 'konum'],
+        summary: 'Misafir Oda kategorisinde nötr geri bildirim verdi.',
+        confidence: 0.6,
+      ),
+    ),
+    Review(
+      id: 'seed-4',
+      comment:
+          'Kahvaltı büfesi harikaydı, özellikle yöresel lezzetler çok '
+          'başarılı. Restoran personeli de güler yüzlüydü.',
+      rating: 5,
+      source: ReviewSource.mobile,
+      reviewDate: DateTime.now().subtract(const Duration(days: 3)),
+      guestName: 'Ali Vural',
+      analysis: const ReviewAnalysis(
+        sentiment: Sentiment.positive,
+        sentimentScore: 0.85,
+        category: 'Yemek',
+        keywords: ['kahvaltı', 'restoran', 'lezzet'],
+        summary: 'Misafir Yemek kategorisinde olumlu geri bildirim verdi.',
+        confidence: 0.72,
+      ),
+    ),
+    Review(
+      id: 'seed-5',
+      comment:
+          'Klima gece boyunca ses yaptı, uyuyamadık. Resepsiyona '
+          'bildirdik ama çözüm gelmedi.',
+      rating: 2,
+      source: ReviewSource.mobile,
+      reviewDate: DateTime.now().subtract(const Duration(days: 4)),
+      guestName: 'Fatma Şahin',
+      analysis: const ReviewAnalysis(
+        sentiment: Sentiment.negative,
+        sentimentScore: -0.65,
+        category: 'Oda',
+        keywords: ['klima', 'gürültü'],
+        summary: 'Misafir Oda kategorisinde olumsuz geri bildirim verdi.',
+        suggestion: 'Oda ile ilgili teknik kontrol listesi gözden geçirilmeli.',
+        confidence: 0.66,
+      ),
+    ),
+  ];
   int _nextId = 1;
 
   @override

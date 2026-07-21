@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widget/app_drawer.dart';
 import '../../../core/widget/empty_state.dart';
 import '../../../core/widget/loading_skeleton.dart';
@@ -34,7 +32,6 @@ class ActionItemsScreen extends ConsumerWidget {
             child: itemsAsync.when(
               loading: () => const ListSkeleton(),
               error: (error, _) => _ErrorView(
-                // Domain hatalarımızın hepsinde message var.
                 message: error is ActionItemFailure
                     ? error.message
                     : 'Görevler yüklenemedi.',
@@ -132,7 +129,7 @@ class _ActionItemCard extends ConsumerWidget {
                 leading: Icon(_statusIcon(status)),
                 title: Text(status.label),
                 trailing: item.status == status
-                    ? const Icon(LucideIcons.check, size: 20)
+                    ? const Icon(Icons.check, size: 20)
                     : null,
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -154,7 +151,7 @@ class _ActionItemCard extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        borderRadius: BorderRadius.circular(12),
         onTap: () => _showStatusSheet(context, ref),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -191,7 +188,7 @@ class _ActionItemCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      LucideIcons.lightbulb,
+                      Icons.lightbulb_outline,
                       size: 16,
                       color: theme.colorScheme.primary,
                     ),
@@ -211,13 +208,12 @@ class _ActionItemCard extends ConsumerWidget {
                 runSpacing: 4,
                 children: [
                   _MetaChip(
-                    icon: LucideIcons.user,
-                    // Atama Angular'dan yapılır - burada salt okunur.
+                    icon: Icons.person_outline,
                     text: item.assignedToName ?? 'Atanmamış',
                   ),
                   if (item.dueDate != null)
                     _MetaChip(
-                      icon: LucideIcons.calendar,
+                      icon: Icons.event_outlined,
                       text: _formatDate(item.dueDate!),
                       color: item.isOverdue ? theme.colorScheme.error : null,
                     ),
@@ -237,11 +233,11 @@ class _ActionItemCard extends ConsumerWidget {
   }
 
   static IconData _statusIcon(ActionStatus status) => switch (status) {
-        ActionStatus.open => LucideIcons.circle,
-        ActionStatus.inProgress => LucideIcons.clock,
-        ActionStatus.resolved => LucideIcons.circle_check,
-        ActionStatus.rejected => LucideIcons.circle_x,
-        ActionStatus.unknown => LucideIcons.circle_question_mark,
+        ActionStatus.open => Icons.radio_button_unchecked,
+        ActionStatus.inProgress => Icons.timelapse,
+        ActionStatus.resolved => Icons.check_circle_outline,
+        ActionStatus.rejected => Icons.cancel_outlined,
+        ActionStatus.unknown => Icons.help_outline,
       };
 }
 
@@ -317,8 +313,6 @@ class _MetaChip extends StatelessWidget {
 }
 
 /// Filtreye göre görev olmadığında gösterilir.
-/// EmptyState kendi ikonunu, başlığını ve boşluğunu çiziyor - dışına
-/// ekstra Column/Icon koymuyoruz.
 class _EmptyView extends StatelessWidget {
   const _EmptyView();
 
@@ -347,7 +341,7 @@ class _ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              LucideIcons.circle_alert,
+              Icons.error_outline,
               size: 56,
               color: Theme.of(context).colorScheme.error,
             ),

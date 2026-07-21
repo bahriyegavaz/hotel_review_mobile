@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 /// JWT token, kullanıcı ve otel seçiminin cihazda saklanmasından sorumlu servis.
 /// iOS'ta Keychain, Android'de Keystore kullanır.
@@ -28,6 +29,27 @@ class SecureStorageService {
   Future<String?> readHotel() => _storage.read(key: _hotelKey);
 
   Future<void> clearHotel() => _storage.delete(key: _hotelKey);
+
+  /// Saklı token'ın süresi dolmuş mu? 
+  /// Backend token'ı 8 saatlik. Uygulama açılışında bu kontrol edilir;
+  /// süre dolmuşsa kullanıcı sunucuya gereksiz 401'li istek atmadan doğrudan
+  /// login'e yönlendirilir.
+  /// Önemli davranış: token YOKSA veya ÇÖZÜLEMİYORSA (örn. fake modda gerçek
+  /// bir JWT üretilmiyor) `false` döneriz - yani "dolmamış say". Böylece
+  /// fake geliştirme akışı bozulmaz; gerçek JWT geldiğinde exp okunur.
+  /// 
+  Future<bool> isTokenExpired() async {
+    final token = await readToken();
+    if (token == null || token.isEmpty) return false;
+
+    try {
+      return JwtDecoder.isExpired(token);
+    } catch (_) {
+      // Geçerli bir JWT değil (fake token vб.) - süre kontrolü yapamayız,
+      // dolmamış kabul et ki akış kırılmasın.
+      return false;
+    }
+  }
 
   /// Logout: oturum verisini VE otel seçimini siler.
   /// Otel seçimi kullanıcıya özel - farklı kullanıcının otelleri farklı,

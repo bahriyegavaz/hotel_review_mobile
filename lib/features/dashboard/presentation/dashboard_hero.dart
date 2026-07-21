@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -63,16 +64,26 @@ class DashboardHero extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(child: _HotelSelectorMenu(current: hotel)),
-                      const SizedBox(width: 12),
-                      _CircleIconButton(
-                        icon: Icons.menu,
-                        onTap: onOpenMenu,
-                      ),
-                    ],
-                  ),
+                  // dashboard_hero.dart içindeki üstteki Row'u (otel seçici + menü olan)
+                 // bununla değiştir:
+                      Row(
+                   children: [
+                   // Menü ikonu solda.
+                  _CircleIconButton(
+                  icon: Icons.menu,
+                  onTap: onOpenMenu,
+                   ),
+                  // Otel seçici ortada - Expanded + Center ile gerçekten ortalı,
+                  // otel adı uzasa da bozulmaz.
+                  Expanded(
+                  child: Center(
+                  child: _HotelSelectorMenu(current: hotel),
+                   ),
+                ),
+                // Sağda menü ikonu genişliği kadar boşluk - simetri için.
+            const SizedBox(width: 44),
+           ],
+           ),
                   const Spacer(),
                   Text(
                     '${_greeting(DateTime.now().hour)} ${userName ?? ''} 👋',
@@ -111,83 +122,108 @@ class DashboardHero extends ConsumerWidget {
   }
 }
 
-// dashboard_hero.dart içindeki _HotelSelectorMenu sınıfının TAMAMINI
-// bununla değiştir. (class _HotelSelectorMenu ... } bloğu)
-
-/// "İşletme: Grand Hotel ▾" - dokununca altında dropdown açılır.
-/// Menü: daha yuvarlak köşeler + hafif mavi (primaryContainer) zemin,
-/// temayla uyumlu.
-class _HotelSelectorMenu extends ConsumerWidget {
+class _HotelSelectorMenu extends ConsumerStatefulWidget {
   const _HotelSelectorMenu({required this.current});
 
   final Hotel? current;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    final hotelsAsync = ref.watch(myHotelsProvider);
-    final hotels = hotelsAsync.value ?? const <Hotel>[];
+  ConsumerState<_HotelSelectorMenu> createState() =>
+      _HotelSelectorMenuState();
+}
 
-    return PopupMenuButton<Hotel>(
-      position: PopupMenuPosition.under,
-      offset: const Offset(0, 8),
-      // Hafif mavi zemin - temanın primaryContainer'ı.
-      color: scheme.primaryContainer,
-      // Daha yumuşak köşeler.
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      elevation: 3,
-      onSelected: (hotel) {
-        ref.read(selectedHotelProvider.notifier).select(hotel);
-      },
-      itemBuilder: (context) => [
-        for (final hotel in hotels)
-          PopupMenuItem<Hotel>(
-            value: hotel,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.apartment_outlined,
-                  size: 20,
-                  // Mavi zeminde okunur ton.
-                  color: scheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        hotel.name,
-                        style: TextStyle(color: scheme.onPrimaryContainer),
-                      ),
-                      if (hotel.city != null)
-                        Text(
-                          hotel.city!,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                color: scheme.onPrimaryContainer
-                                    .withValues(alpha: 0.7),
-                              ),
+class _HotelSelectorMenuState extends ConsumerState<_HotelSelectorMenu> {
+  final _pillKey = GlobalKey();
+
+  void _openMenu() {
+    final hotels = ref.read(myHotelsProvider).value ?? const <Hotel>[];
+    if (hotels.isEmpty) return;
+
+    // Pill'in ekrandaki konumu ve boyutu - menüyü tam altına koymak için.
+    final box = _pillKey.currentContext!.findRenderObject()! as RenderBox;
+    final offset = box.localToGlobal(Offset.zero);
+    final size = box.size;
+
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Kapat',
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (_, _, _) => const SizedBox.shrink(),
+      transitionBuilder: (context, anim, _, child) {
+        final scheme = Theme.of(context).colorScheme;
+        final hotels = ref.read(myHotelsProvider).value ?? const <Hotel>[];
+        final current = widget.current;
+
+        return Stack(
+          children: [
+            // Menü, pill'in tam altında.
+            Positioned(
+              left: offset.dx,
+              top: offset.dy + size.height + 8,
+              width: 260,
+              child: FadeTransition(
+                opacity: anim,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.96, end: 1).animate(
+                    CurvedAnimation(parent: anim, curve: Curves.easeOut),
+                  ),
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        // Arkadaki fotoğrafı bulanıklaştır - buzlu cam.
+                        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            // Yarı saydam - blur'lu arka plan görünsün.
+                            color: scheme.surface.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final hotel in hotels)
+                                _HotelRow(
+                                  hotel: hotel,
+                                  selected: hotel.id == current?.id,
+                                  onTap: () {
+                                    ref
+                                        .read(selectedHotelProvider.notifier)
+                                        .select(hotel);
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                            ],
+                          ),
                         ),
-                    ],
+                      ),
+                    ),
                   ),
                 ),
-                if (hotel.id == current?.id)
-                  Icon(
-                    Icons.check_circle,
-                    size: 18,
-                    color: scheme.onPrimaryContainer,
-                  ),
-              ],
+              ),
             ),
-          ),
-      ],
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = widget.current;
+
+    return GestureDetector(
+      onTap: _openMenu,
       child: Container(
+        key: _pillKey,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.15),
@@ -240,6 +276,60 @@ class _HotelSelectorMenu extends ConsumerWidget {
               color: Colors.white,
               size: 18,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Menü içindeki tek otel satırı. Buzlu cam üstünde okunur renkler.
+class _HotelRow extends StatelessWidget {
+  const _HotelRow({
+    required this.hotel,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Hotel hotel;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.apartment_outlined, size: 20, color: scheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    hotel.name,
+                    style: TextStyle(
+                      color: scheme.onSurface,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                  if (hotel.city != null)
+                    Text(
+                      hotel.city!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurface.withValues(alpha: 0.7),
+                          ),
+                    ),
+                ],
+              ),
+            ),
+            if (selected)
+              Icon(Icons.check_circle, size: 18, color: scheme.primary),
           ],
         ),
       ),

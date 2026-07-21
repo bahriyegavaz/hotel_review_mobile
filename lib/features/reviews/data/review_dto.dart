@@ -29,7 +29,7 @@ class ReviewAnalysisDto {
       sentiment: json['sentiment'] as String? ?? '',
       // int de double da gelebilir - num üzerinden geçiyoruz.
       sentimentScore: (json['sentimentScore'] as num?)?.toDouble() ?? 0,
-      category: json['category'] as String? ?? '',
+      category: json['category'] as String? ?? 'Genel',
       keywords: (json['keywords'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

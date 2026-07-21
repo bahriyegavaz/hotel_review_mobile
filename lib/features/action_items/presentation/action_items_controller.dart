@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/domain/user.dart';
 import '../../auth/presentation/session_controller.dart';
 import '../domain/action_item.dart';
 import '../domain/action_item_repository.dart';
@@ -11,7 +12,8 @@ import 'action_item_providers.dart';
 /// üç durumu var: loading, data, error. Bunları elle yazmak yerine
 /// AsyncValue'ya bırakıyoruz.
 class ActionItemsController extends AsyncNotifier<List<ActionItem>> {
-  ActionItemRepository get _repository => ref.read(actionItemRepositoryProvider);
+  ActionItemRepository get _repository =>
+      ref.read(actionItemRepositoryProvider);
 
   @override
   Future<List<ActionItem>> build() => _repository.getActionItems();
@@ -70,18 +72,36 @@ final actionItemsControllerProvider =
 /// Filtreleme mantığı controller'da değil burada - çünkü bu bir "türetilmiş
 /// veri", state değil. Filtre değişince liste sunucudan tekrar çekilmez,
 /// sadece süzülür.
+///
+/// İki katmanlı süzme:
+///   1. ROL: departmentUser sadece kendi departmanının görevlerini görür.
+///      Admin/Manager her şeyi görür. (Gerçekte backend JWT'den filtreler;
+///      fake ile çalışırken bu satır aynı davranışı simüle eder ve backend
+///      bir gün eksik filtrelese bile ikinci bir güvence olur.)
+///   2. CHIP: kullanıcının seçtiği filtre (Tümü / Bana atananlar / Açık).
 final filteredActionItemsProvider =
     Provider<AsyncValue<List<ActionItem>>>((ref) {
   final itemsAsync = ref.watch(actionItemsControllerProvider);
   final filter = ref.watch(actionFilterProvider);
-  final currentUserId = ref.watch(currentUserProvider)?.id;
+  final currentUser = ref.watch(currentUserProvider);
 
   return itemsAsync.whenData((items) {
+    // 1. Rol süzmesi: departman personeli sadece kendi departmanını görür.
+    final visibleItems = (currentUser != null &&
+            currentUser.role == UserRole.departmentUser &&
+            currentUser.departmentId != null)
+        ? items
+            .where((i) => i.departmentId == currentUser.departmentId)
+            .toList()
+        : items;
+
+    // 2. Chip süzmesi.
     final filtered = switch (filter) {
-      ActionFilter.all => items,
+      ActionFilter.all => visibleItems,
       ActionFilter.assignedToMe =>
-        items.where((i) => i.isAssignedTo(currentUserId)).toList(),
-      ActionFilter.open => items.where((i) => !i.status.isClosed).toList(),
+        visibleItems.where((i) => i.isAssignedTo(currentUser?.id)).toList(),
+      ActionFilter.open =>
+        visibleItems.where((i) => !i.status.isClosed).toList(),
     };
 
     // Gecikmiş görevler üstte, sonra açık olanlar, en altta kapalılar.
@@ -92,7 +112,6 @@ final filteredActionItemsProvider =
         }
         return 0;
       });
-
     return sorted;
   });
 });
