@@ -32,6 +32,8 @@
 	<string>Yorumunuza fotoğraf eklemek için galeri erişimi gerekiyor.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
+	<key>NSAppTransportSecurity</key>
+<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 		<key>UISceneConfigurations</key>
