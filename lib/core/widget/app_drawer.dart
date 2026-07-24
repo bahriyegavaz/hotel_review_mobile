@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/auth/domain/user.dart';
 import '../../features/auth/presentation/session_controller.dart';
 import '../router/app_routes.dart';
 
@@ -22,10 +21,7 @@ class AppDrawer extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final currentLocation = GoRouterState.of(context).matchedLocation;
 
-    // Yorumlar menüsü sadece yönetici rollerine görünür.
-    final canSeeReviews =
-        user?.role == UserRole.admin || user?.role == UserRole.manager;
-
+  
     return Drawer(
       child: SafeArea(
         child: Column(
@@ -91,17 +87,16 @@ class AppDrawer extends ConsumerWidget {
             ),
             _DrawerItem(
               icon: Icons.checklist_outlined,
-              label: 'Görevler',
+              label: 'Aksiyonlar',
               selected: currentLocation == AppRoutes.actionItems,
               onTap: () => _go(context, AppRoutes.actionItems),
             ),
-            if (canSeeReviews)
-              _DrawerItem(
-                icon: Icons.reviews_outlined,
-                label: 'Yorumlar',
-                selected: currentLocation == AppRoutes.reviews,
-                onTap: () => _go(context, AppRoutes.reviews),
-              ),
+            _DrawerItem(
+              icon: Icons.reviews_outlined,
+              label: 'Yorumlar',
+              selected: currentLocation == AppRoutes.reviews,
+              onTap: () => _go(context, AppRoutes.reviews),
+            ),
             _DrawerItem(
               icon: Icons.add_comment_outlined,
               label: 'Yorum Ekle',

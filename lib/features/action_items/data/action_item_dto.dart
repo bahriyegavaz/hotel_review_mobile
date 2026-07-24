@@ -10,6 +10,7 @@ class ActionItemDto {
     required this.title,
     required this.status,
     required this.departmentId,
+    this.departmentName,
     this.reviewId,
     this.assignedTo,
     this.assignedToName,
@@ -22,6 +23,7 @@ class ActionItemDto {
   final String title;
   final String status;
   final String departmentId;
+  final String? departmentName;
   final String? reviewId;
   final String? assignedTo;
   final String? assignedToName;
@@ -35,6 +37,7 @@ class ActionItemDto {
       title: json['title'] as String? ?? '',
       status: json['status'] as String? ?? '',
       departmentId: json['departmentId']?.toString() ?? '',
+      departmentName: json['departmentName'] as String?,
       reviewId: json['reviewId']?.toString(),
       assignedTo: json['assignedTo']?.toString(),
       assignedToName: json['assignedToName'] as String?,
@@ -43,18 +46,25 @@ class ActionItemDto {
       suggestion: json['suggestion'] as String?,
     );
   }
+  static String _cleanTitle(String raw) {
+    final cleaned = raw.replaceFirst(RegExp(r'^\s*\[[^\]]*\]\s*'), '').trim();
+    if (cleaned.isEmpty) return raw;
+    // İlk harfi büyüt - yorum metni küçük harfle başlıyor olabilir.
+    return cleaned[0].toUpperCase() + cleaned.substring(1);
+  }
 
   ActionItem toDomain() => ActionItem(
-        id: id,
-        title: title,
-        status: ActionStatus.fromString(status),
-        departmentId: departmentId,
-        reviewId: reviewId,
-        assignedToId: assignedTo,
-        assignedToName: assignedToName,
-        // Bozuk/eksik tarih gelirse null kalsın, çökmesin.
-        dueDate: dueDate == null ? null : DateTime.tryParse(dueDate!),
-        reviewComment: reviewComment,
-        suggestion: suggestion,
-      );
+    id: id,
+    title: _cleanTitle(title),
+    status: ActionStatus.fromString(status),
+    departmentId: departmentId,
+    departmentName: departmentName,
+    reviewId: reviewId,
+    assignedToId: assignedTo,
+    assignedToName: assignedToName,
+    // Bozuk/eksik tarih gelirse null kalsın, çökmesin.
+    dueDate: dueDate == null ? null : DateTime.tryParse(dueDate!),
+    reviewComment: reviewComment,
+    suggestion: suggestion,
+  );
 }

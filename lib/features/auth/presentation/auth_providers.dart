@@ -11,7 +11,7 @@ import '../domain/auth_repository.dart';
 ///   flutter run --dart-define=USE_FAKE_AUTH=false
 const bool useFakeAuth = bool.fromEnvironment(
   'USE_FAKE_AUTH',
-  defaultValue: true,
+  defaultValue: false,
 );
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

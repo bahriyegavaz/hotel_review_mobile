@@ -20,16 +20,29 @@ final actionItemRepositoryProvider = Provider<ActionItemRepository>((ref) {
 });
 
 /// Listenin üstündeki filtre çipleri.
+///
+/// Admin/Manager tüm departmanları görebildiği için bu çipler onlara
+/// gösterilmiyor - onun yerine departman seçici (bkz. departmentFilterProvider)
+/// kullanılıyor. Bu enum sadece departman personeli (kendi departmanına
+/// sabitlenmiş kullanıcılar) için geçerli.
 enum ActionFilter {
   all,
   assignedToMe,
   open;
 
   String get label => switch (this) {
-        ActionFilter.all => 'Tümü',
-        ActionFilter.assignedToMe => 'Bana atananlar',
-        ActionFilter.open => 'Açık',
-      };
+    ActionFilter.all => 'Tümü',
+    ActionFilter.assignedToMe => 'Atanan',
+    ActionFilter.open => 'Açık',
+  };
+
+  /// Departman personeline gösterilen çipler - "Tümü" gösterilmiyor çünkü
+  /// zaten sadece kendi departmanlarını görüyorlar, "Tümü" onlar için
+  /// "Atanan"dan anlamlı bir şekilde ayrışmıyor.
+  static const List<ActionFilter> departmentUserValues = [
+    ActionFilter.assignedToMe,
+    ActionFilter.open,
+  ];
 }
 
 /// Seçili filtreyi tutar.
@@ -47,5 +60,21 @@ class ActionFilterController extends Notifier<ActionFilter> {
 
 final actionFilterProvider =
     NotifierProvider<ActionFilterController, ActionFilter>(
-  ActionFilterController.new,
-);
+      ActionFilterController.new,
+    );
+
+/// Admin/Manager için üstteki departman seçici. `null` = "Tümü" (hepsi).
+///
+/// ActionFilterController ile aynı desen (bkz. yukarıdaki yorum) - basit
+/// state için Notifier kullanıyoruz.
+class DepartmentFilterController extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void select(String? departmentId) => state = departmentId;
+}
+
+final departmentFilterProvider =
+    NotifierProvider<DepartmentFilterController, String?>(
+      DepartmentFilterController.new,
+    );

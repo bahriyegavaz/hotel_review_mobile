@@ -10,7 +10,7 @@ import '../domain/dashboard_summary.dart';
 /// Ya da: flutter run --dart-define=USE_FAKE_DASHBOARD=false
 const bool useFakeDashboard = bool.fromEnvironment(
   'USE_FAKE_DASHBOARD',
-  defaultValue: true,
+  defaultValue: false,
 );
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
@@ -36,5 +36,5 @@ class DashboardController extends AsyncNotifier<DashboardSummary> {
 
 final dashboardControllerProvider =
     AsyncNotifierProvider<DashboardController, DashboardSummary>(
-  DashboardController.new,
-);
+      DashboardController.new,
+    );

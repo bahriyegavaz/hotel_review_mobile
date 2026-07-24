@@ -1,71 +1,148 @@
 import '../domain/dashboard_summary.dart';
 
-/// !!! BACKEND GELİNCE KONTROL EDİLECEK !!!
-/// Rapor bölüm 8: GET /api/dashboard/summary + /api/dashboard/trends.
-/// Trend ve şikayet verisi ayrı endpoint'ten de gelebilir - o durumda
-/// ApiDashboardRepository iki çağrı yapıp birleştirir. Şimdilik tek
-/// response'ta geldiğini varsayıyoruz. Alan adları tahmin.
+/// GET /api/dashboard/summary
+///
+/// Backend'in döndüğü gerçek gövde:
+///   { "totalReviews": 25, "averageRating": 4, "openActionItems": 16,
+///     "negativeRatio": 48 }
+///
+/// Trend/kategori/anahtar kelime burada YOK - ayrı endpoint'lerden geliyor
+/// (bkz. DailyRatingPointDto, CategoryDistributionItemDto, top-keywords).
+/// Mobil bazı alanları farklı isimlerle bekliyordu; birden çok isim
+/// deneniyor ki backend alan adlarını değiştirse de DTO çalışmaya devam etsin.
 class DashboardSummaryDto {
   const DashboardSummaryDto({
     required this.todayReviewCount,
     required this.openActionCount,
     required this.negativeReviewCount,
-    required this.totalReviewCount,
+    required this.totalReviews,
     this.averageRating,
-    this.negativeTrend = const [],
-    this.recurringComplaints = const [],
   });
 
   final int todayReviewCount;
   final int openActionCount;
   final int negativeReviewCount;
-  final int totalReviewCount;
+  final int totalReviews;
   final double? averageRating;
-  final List<DailyNegativeCount> negativeTrend;
-  final List<RecurringComplaint> recurringComplaints;
 
   factory DashboardSummaryDto.fromJson(Map<String, dynamic> json) {
-    int readInt(String key) => (json[key] as num?)?.toInt() ?? 0;
+    /// Verilen anahtarlardan ilk dolu olanı okur.
+    num? readNum(List<String> keys) {
+      for (final key in keys) {
+        final value = json[key];
+        if (value is num) return value;
+      }
+      return null;
+    }
 
-    final trendRaw = json['negativeTrend'];
-    final trend = trendRaw is List
-        ? trendRaw.whereType<Map<String, dynamic>>().map((e) {
-            return DailyNegativeCount(
-              date: DateTime.tryParse(e['date'] as String? ?? '') ??
-                  DateTime.now(),
-              count: (e['count'] as num?)?.toInt() ?? 0,
-            );
-          }).toList()
-        : <DailyNegativeCount>[];
+    int readInt(List<String> keys) => readNum(keys)?.toInt() ?? 0;
 
-    final complaintsRaw = json['recurringComplaints'];
-    final complaints = complaintsRaw is List
-        ? complaintsRaw.whereType<Map<String, dynamic>>().map((e) {
-            return RecurringComplaint(
-              keyword: e['keyword'] as String? ?? '',
-              count: (e['count'] as num?)?.toInt() ?? 0,
-            );
-          }).toList()
-        : <RecurringComplaint>[];
+    final totalReviews = readInt(const ['totalReviews', 'totalReviewCount']);
+
+    // Negatif yorum SAYISI doğrudan gelmiyorsa, ORANDAN türet.
+    // Backend şu an sadece negativeRatio (yüzde) gönderiyor.
+    var negativeCount = readInt(const [
+      'negativeReviewCount',
+      'negativeReviews',
+      'negativeCount',
+    ]);
+    if (negativeCount == 0) {
+      final ratio = readNum(const ['negativeRatio'])?.toDouble();
+      if (ratio != null && totalReviews > 0) {
+        negativeCount = (totalReviews * ratio / 100).round();
+      }
+    }
 
     return DashboardSummaryDto(
-      todayReviewCount: readInt('todayReviewCount'),
-      openActionCount: readInt('openActionCount'),
-      negativeReviewCount: readInt('negativeReviewCount'),
-      totalReviewCount: readInt('totalReviewCount'),
-      averageRating: (json['averageRating'] as num?)?.toDouble(),
-      negativeTrend: trend,
-      recurringComplaints: complaints,
+      todayReviewCount: readInt(const [
+        'todayReviewCount',
+        'todayReviews',
+        'todaysReviewCount',
+      ]),
+      openActionCount: readInt(const [
+        'openActionCount',
+        'openActionItems',
+        'openActions',
+      ]),
+      negativeReviewCount: negativeCount,
+      totalReviews: totalReviews,
+      averageRating: readNum(const ['averageRating', 'avgRating'])?.toDouble(),
+    );
+  }
+}
+
+/// GET /api/dashboard/trends
+/// [{ "date": "2026-07-22", "averageRating": 4.27, "reviewCount": 11 }]
+class DailyRatingPointDto {
+  const DailyRatingPointDto({
+    required this.date,
+    required this.averageRating,
+    required this.reviewCount,
+  });
+
+  final String date;
+  final double averageRating;
+  final int reviewCount;
+
+  factory DailyRatingPointDto.fromJson(Map<String, dynamic> json) {
+    return DailyRatingPointDto(
+      date: json['date'] as String? ?? '',
+      averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0,
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
     );
   }
 
-  DashboardSummary toDomain() => DashboardSummary(
-        todayReviewCount: todayReviewCount,
-        openActionCount: openActionCount,
-        negativeReviewCount: negativeReviewCount,
-        totalReviewCount: totalReviewCount,
-        averageRating: averageRating,
-        negativeTrend: negativeTrend,
-        recurringComplaints: recurringComplaints,
-      );
+  DailyRatingPoint toDomain() => DailyRatingPoint(
+    date: DateTime.tryParse(date) ?? DateTime.now(),
+    averageRating: averageRating,
+    reviewCount: reviewCount,
+  );
+}
+
+/// GET /api/dashboard/category-distribution
+/// [{ "categoryName": "Banyo & Tuvalet", "reviewCount": 9, "negativeRatio": 11.1 }]
+class CategoryDistributionItemDto {
+  const CategoryDistributionItemDto({
+    required this.categoryName,
+    required this.reviewCount,
+    required this.negativeRatio,
+  });
+
+  final String categoryName;
+  final int reviewCount;
+  final double negativeRatio;
+
+  factory CategoryDistributionItemDto.fromJson(Map<String, dynamic> json) {
+    return CategoryDistributionItemDto(
+      categoryName: json['categoryName'] as String? ?? 'Diğer',
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      negativeRatio: (json['negativeRatio'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  CategoryDistributionItem toDomain() => CategoryDistributionItem(
+    categoryName: categoryName,
+    reviewCount: reviewCount,
+    negativeRatio: negativeRatio,
+  );
+}
+
+/// GET /api/dashboard/top-keywords
+/// [{ "keyword": "oda", "count": 6 }]
+class RecurringComplaintDto {
+  const RecurringComplaintDto({required this.keyword, required this.count});
+
+  final String keyword;
+  final int count;
+
+  factory RecurringComplaintDto.fromJson(Map<String, dynamic> json) {
+    return RecurringComplaintDto(
+      keyword: (json['keyword'] ?? json['word'] ?? json['text'] ?? '')
+          .toString(),
+      count: (json['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  RecurringComplaint toDomain() =>
+      RecurringComplaint(keyword: keyword, count: count);
 }

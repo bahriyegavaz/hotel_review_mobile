@@ -23,20 +23,20 @@ enum ActionStatus {
 
   /// Backend'e gönderirken. .NET enum'ları genelde PascalCase.
   String get apiValue => switch (this) {
-        ActionStatus.open => 'Open',
-        ActionStatus.inProgress => 'InProgress',
-        ActionStatus.resolved => 'Resolved',
-        ActionStatus.rejected => 'Rejected',
-        ActionStatus.unknown => 'Open',
-      };
+    ActionStatus.open => 'Open',
+    ActionStatus.inProgress => 'InProgress',
+    ActionStatus.resolved => 'Resolved',
+    ActionStatus.rejected => 'Rejected',
+    ActionStatus.unknown => 'Open',
+  };
 
   String get label => switch (this) {
-        ActionStatus.open => 'Açık',
-        ActionStatus.inProgress => 'Devam Ediyor',
-        ActionStatus.resolved => 'Tamamlandı',
-        ActionStatus.rejected => 'Reddedildi',
-        ActionStatus.unknown => 'Bilinmiyor',
-      };
+    ActionStatus.open => 'Açık',
+    ActionStatus.inProgress => 'Devam Ediyor',
+    ActionStatus.resolved => 'Tamamlandı',
+    ActionStatus.rejected => 'Reddedildi',
+    ActionStatus.unknown => 'Bilinmiyor',
+  };
 
   /// Kapalı durumlar - bunlardan sonra değişiklik beklenmiyor.
   bool get isClosed =>
@@ -44,11 +44,11 @@ enum ActionStatus {
 
   /// Mobilden seçilebilecek durumlar (unknown hariç).
   static List<ActionStatus> get selectable => const [
-        ActionStatus.open,
-        ActionStatus.inProgress,
-        ActionStatus.resolved,
-        ActionStatus.rejected,
-      ];
+    ActionStatus.open,
+    ActionStatus.inProgress,
+    ActionStatus.resolved,
+    ActionStatus.rejected,
+  ];
 }
 
 /// Rapor bölüm 7: action_items tablosu.
@@ -59,6 +59,7 @@ class ActionItem {
     required this.title,
     required this.status,
     required this.departmentId,
+    this.departmentName,
     this.reviewId,
     this.assignedToId,
     this.assignedToName,
@@ -71,6 +72,7 @@ class ActionItem {
   final String title;
   final ActionStatus status;
   final String departmentId;
+  final String? departmentName;
 
   /// Görevin doğduğu negatif yorum.
   final String? reviewId;
@@ -93,20 +95,39 @@ class ActionItem {
     return dueDate!.isBefore(DateTime.now());
   }
 
-  bool isAssignedTo(String? userId) =>
-      userId != null && assignedToId == userId;
+  bool isAssignedTo(String? userId) => userId != null && assignedToId == userId;
 
   /// Durum güncellendiğinde yeni bir kopya üret (immutable model).
   ActionItem copyWithStatus(ActionStatus newStatus) => ActionItem(
-        id: id,
-        title: title,
-        status: newStatus,
-        departmentId: departmentId,
-        reviewId: reviewId,
-        assignedToId: assignedToId,
-        assignedToName: assignedToName,
-        dueDate: dueDate,
-        reviewComment: reviewComment,
-        suggestion: suggestion,
-      );
+    id: id,
+    title: title,
+    status: newStatus,
+    departmentId: departmentId,
+    departmentName: departmentName,
+    reviewId: reviewId,
+    assignedToId: assignedToId,
+    assignedToName: assignedToName,
+    dueDate: dueDate,
+    reviewComment: reviewComment,
+    suggestion: suggestion,
+  );
+
+  /// AI'ın önerdiği departman yanlışsa Admin/Manager düzeltebilir - kişi
+  /// bazlı değil departman bazlı gidiyoruz (bkz. ActionItemRepository).
+  ActionItem copyWithDepartment({
+    required String departmentId,
+    String? departmentName,
+  }) => ActionItem(
+    id: id,
+    title: title,
+    status: status,
+    departmentId: departmentId,
+    departmentName: departmentName,
+    reviewId: reviewId,
+    assignedToId: assignedToId,
+    assignedToName: assignedToName,
+    dueDate: dueDate,
+    reviewComment: reviewComment,
+    suggestion: suggestion,
+  );
 }

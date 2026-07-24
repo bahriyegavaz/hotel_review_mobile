@@ -14,6 +14,7 @@ class FakeActionItemRepository implements ActionItemRepository {
         title: 'Banyo kontrol checklisti güncellensin',
         status: ActionStatus.open,
         departmentId: '10',
+        departmentName: 'Kat Hizmetleri & Temizlik',
         reviewId: '101',
         assignedToId: '3',
         assignedToName: 'Housekeeping Personeli',
@@ -28,6 +29,7 @@ class FakeActionItemRepository implements ActionItemRepository {
         title: 'Oda 304 klima arızası kontrolü',
         status: ActionStatus.inProgress,
         departmentId: '10',
+        departmentName: 'Kat Hizmetleri & Temizlik',
         reviewId: '102',
         assignedToId: '3',
         assignedToName: 'Housekeeping Personeli',
@@ -39,6 +41,7 @@ class FakeActionItemRepository implements ActionItemRepository {
         title: 'Havlu stoğu yenilensin',
         status: ActionStatus.open,
         departmentId: '10',
+        departmentName: 'Kat Hizmetleri & Temizlik',
         reviewId: '103',
         // Atanmamış görev - "Atanmamış" etiketini test etmek için.
         dueDate: DateTime.now().add(const Duration(days: 5)),
@@ -49,6 +52,7 @@ class FakeActionItemRepository implements ActionItemRepository {
         title: 'Kahvaltı büfesi çeşitliliği artırılsın',
         status: ActionStatus.resolved,
         departmentId: '10',
+        departmentName: 'Kat Hizmetleri & Temizlik',
         reviewId: '104',
         assignedToId: '2',
         assignedToName: 'Demo Müdür',
@@ -59,6 +63,7 @@ class FakeActionItemRepository implements ActionItemRepository {
         title: 'Kahvaltı büfesi ekipman kontrolü',
         status: ActionStatus.open,
         departmentId: '20',
+        departmentName: 'Mutfak & F&B',
         assignedToName: 'Mutfak Ekibi',
         dueDate: DateTime.now().add(const Duration(days: 2)),
         reviewComment: 'Kahvaltıda sıcak yemekler soğuktu.',
@@ -69,10 +74,11 @@ class FakeActionItemRepository implements ActionItemRepository {
         title: 'Menü alerjen etiketleri güncellensin',
         status: ActionStatus.inProgress,
         departmentId: '20',
+        departmentName: 'Mutfak & F&B',
         assignedToName: 'Mutfak Ekibi',
         dueDate: DateTime.now().add(const Duration(days: 5)),
         suggestion: 'Alerjen bilgisi eksik ürünler işaretlenmeli.',
-      ), 
+      ),
     ];
   }
 
@@ -85,7 +91,7 @@ class FakeActionItemRepository implements ActionItemRepository {
   }
 
   @override
-  Future<ActionItem> updateStatus({
+  Future<void> updateStatus({
     required String id,
     required ActionStatus status,
   }) async {
@@ -93,11 +99,51 @@ class FakeActionItemRepository implements ActionItemRepository {
 
     final index = _items.indexWhere((item) => item.id == id);
     if (index == -1) {
-      throw const UnknownActionItemFailure('Görev bulunamadı.');
+      throw const UnknownActionItemFailure('Aksiyon bulunamadı.');
     }
 
-    final updated = _items[index].copyWithStatus(status);
-    _items[index] = updated;
-    return updated;
+    _items[index] = _items[index].copyWithStatus(status);
+  }
+
+  @override
+  Future<void> reassignDepartment({
+    required String id,
+    required String departmentId,
+    required String departmentName,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+
+    final index = _items.indexWhere((item) => item.id == id);
+    if (index == -1) {
+      throw const UnknownActionItemFailure('Aksiyon bulunamadı.');
+    }
+
+    _items[index] = _items[index].copyWithDepartment(
+      departmentId: departmentId,
+      departmentName: departmentName,
+    );
+  }
+
+  @override
+  Future<ActionItem> createManualActionItem({
+    required String reviewId,
+    required String departmentId,
+    required String departmentName,
+    required String title,
+    DateTime? dueDate,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+
+    final created = ActionItem(
+      id: 'manual-${_items.length + 1}',
+      title: title,
+      status: ActionStatus.open,
+      departmentId: departmentId,
+      departmentName: departmentName,
+      reviewId: reviewId,
+      dueDate: dueDate,
+    );
+    _items.add(created);
+    return created;
   }
 }

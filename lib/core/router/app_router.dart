@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/action_items/presentation/action_items_screen.dart';
-import '../../features/auth/domain/user.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/session_controller.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -11,6 +10,8 @@ import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/hotels/presentation/hotel_providers.dart';
 import '../../features/hotels/presentation/hotel_selection_screen.dart';
 import '../../features/reviews/presentation/add_review_screen.dart';
+import '../../features/reviews/presentation/review_analysis_screen.dart';
+import '../../features/reviews/presentation/review_detail_screen.dart';
 import '../../features/reviews/presentation/reviews_list_screen.dart';
 import 'app_routes.dart';
 
@@ -55,8 +56,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         return location == AppRoutes.login ? null : AppRoutes.login;
       }
 
-      // Buradan sonrası: giriş yapılmış.
-      final user = (session as SessionAuthenticated).user;
+      
 
       // Otel seçimi okunuyor - bekle.
       if (hotel is HotelUnknown) {
@@ -72,12 +72,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Rol koruması: Yorumlar sadece admin/manager.
       // Drawer'da gizli ama doğrudan yönlendirme denenirse burada kesilir.
-      final canSeeReviews =
-          user.role == UserRole.admin || user.role == UserRole.manager;
-      if (location == AppRoutes.reviews && !canSeeReviews) {
-        return AppRoutes.dashboard;
-      }
-
+      
       // Giriş + otel tamam: login/splash/otel seçiminde takılı kalmasın.
       if (location == AppRoutes.login ||
           location == AppRoutes.splash ||
@@ -111,6 +106,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.addReview,
         builder: (context, state) => const AddReviewScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.reviewDetail,
+        builder: (context, state) => ReviewDetailScreen(
+          reviewId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.reviewAnalysis,
+        builder: (context, state) => ReviewAnalysisScreen(
+          reviewId: state.pathParameters['id']!,
+        ),
       ),
       GoRoute(
         path: AppRoutes.actionItems,

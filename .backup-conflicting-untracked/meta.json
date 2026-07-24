@@ -1,0 +1,10 @@
+{
+  "bootstrap_done": true,
+  "last_retrain": null,
+  "accuracy_before": null,
+  "accuracy_after": null,
+  "total_retrains": 0,
+  "samples_trained_last": 0,
+  "bootstrap_imported": 30,
+  "bootstrap_at": "2026-07-23T14:02:46.515054+00:00"
+}

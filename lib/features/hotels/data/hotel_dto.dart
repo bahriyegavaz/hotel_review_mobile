@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import '../domain/hotel.dart';
 
-/// !!! BACKEND GELİNCE KONTROL EDİLECEK !!!
-/// Alan adları tahmin - raporda hotels tablosu hiç yok.
+/// Backend GET /api/hotels şu alanları döner: id, name, code, address.
+/// `city` burada backend'in `address` alanına eşleniyor (örn. "Belek, Antalya").
 class HotelDto {
   const HotelDto({required this.id, required this.name, this.city});
 
@@ -16,7 +16,7 @@ class HotelDto {
       // id int de Guid de olabilir.
       id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
-      city: json['city'] as String?,
+      city: json['address'] as String?,
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../storage/storage_providers.dart';
 import 'auth_interceptor.dart';
 import 'dio_client.dart';
+import 'hotel_header_interceptor.dart';
 
 final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
   final storageService = ref.watch(secureStorageServiceProvider);
@@ -16,7 +17,16 @@ final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
   );
 });
 
+final hotelHeaderInterceptorProvider = Provider<HotelHeaderInterceptor>((ref) {
+  final storageService = ref.watch(secureStorageServiceProvider);
+  return HotelHeaderInterceptor(storageService);
+});
+
 final dioProvider = Provider<Dio>((ref) {
   final authInterceptor = ref.watch(authInterceptorProvider);
-  return createDioClient(authInterceptor: authInterceptor);
+  final hotelHeaderInterceptor = ref.watch(hotelHeaderInterceptorProvider);
+  return createDioClient(
+    authInterceptor: authInterceptor,
+    hotelHeaderInterceptor: hotelHeaderInterceptor,
+  );
 });

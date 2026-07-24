@@ -3,34 +3,29 @@ import 'package:flutter/material.dart';
 
 import '../domain/dashboard_summary.dart';
 
-/// Negatif yorum trendini gösteren alan grafiği (area line chart).
+/// Günlük ortalama puan trendini gösteren alan grafiği (area line chart).
 ///
-/// fl_chart kullanıyor - önceki elle çizilen çubuk grafiğin yerine geçti.
-/// Yumuşak eğri (isCurved), altında gölgeli dolgu, en yüksek noktada vurgu.
-///
-/// Renk kırmızı: negatif yorum bir uyarı göstergesi, temanın mavisiyle
-/// değil hata rengiyle çiziliyor - kullanıcı "kötü giden bir şey" algısını
-/// anında alsın.
-class NegativeTrendChart extends StatelessWidget {
-  const NegativeTrendChart({super.key, required this.data});
+/// Y ekseni sabit 0-5 (puan skalası) - günden güne kıyaslanabilir olsun.
+/// En düşük puanlı gün vurgulanır: düşen puan bir erken uyarı sinyali.
+class RatingTrendChart extends StatelessWidget {
+  const RatingTrendChart({super.key, required this.data});
 
-  final List<DailyNegativeCount> data;
+  final List<DailyRatingPoint> data;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final lineColor = scheme.error;
+    final lineColor = scheme.primary;
 
     // fl_chart x eksenini sayısal ister; günleri 0,1,2... indeksliyoruz.
     final spots = <FlSpot>[
       for (var i = 0; i < data.length; i++)
-        FlSpot(i.toDouble(), data[i].count.toDouble()),
+        FlSpot(i.toDouble(), data[i].averageRating),
     ];
 
-    // Y ekseni üst sınırı: en yüksek değerin biraz üstü (nefes alsın).
-    final maxCount =
-        data.map((d) => d.count).fold<int>(0, (a, b) => a > b ? a : b);
-    final maxY = (maxCount + 1).toDouble();
+    final minRating = data
+        .map((d) => d.averageRating)
+        .fold<double>(5, (a, b) => a < b ? a : b);
 
     return SizedBox(
       height: 160,
@@ -39,12 +34,12 @@ class NegativeTrendChart extends StatelessWidget {
           minX: 0,
           maxX: (data.length - 1).toDouble(),
           minY: 0,
-          maxY: maxY,
+          maxY: 5,
           // --- Izgara ---
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: maxY <= 4 ? 1 : (maxY / 4).ceilToDouble(),
+            horizontalInterval: 1,
             getDrawingHorizontalLine: (value) => FlLine(
               color: scheme.outlineVariant.withValues(alpha: 0.3),
               strokeWidth: 1,
@@ -54,20 +49,22 @@ class NegativeTrendChart extends StatelessWidget {
           borderData: FlBorderData(show: false),
           // --- Eksen etiketleri ---
           titlesData: FlTitlesData(
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 28,
-                interval: maxY <= 4 ? 1 : (maxY / 4).ceilToDouble(),
+                interval: 1,
                 getTitlesWidget: (value, meta) => Text(
                   value.toInt().toString(),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).hintColor,
-                      ),
+                    color: Theme.of(context).hintColor,
+                  ),
                 ),
               ),
             ),
@@ -86,8 +83,8 @@ class NegativeTrendChart extends StatelessWidget {
                     child: Text(
                       _weekday(data[index].date),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(context).hintColor,
-                          ),
+                        color: Theme.of(context).hintColor,
+                      ),
                     ),
                   );
                 },
@@ -97,12 +94,14 @@ class NegativeTrendChart extends StatelessWidget {
           // --- Dokunma / tooltip ---
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
-              getTooltipColor: (_) => scheme.error,
+              getTooltipColor: (_) => lineColor,
               getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+                final point = data[spot.x.toInt()];
                 return LineTooltipItem(
-                  '${spot.y.toInt()} negatif',
+                  '${point.averageRating.toStringAsFixed(1)} ★\n'
+                  '${point.reviewCount} yorum',
                   TextStyle(
-                    color: scheme.onError,
+                    color: scheme.onPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
@@ -122,11 +121,11 @@ class NegativeTrendChart extends StatelessWidget {
               dotData: FlDotData(
                 show: true,
                 getDotPainter: (spot, percent, bar, index) {
-                  // Sadece en yüksek noktayı vurgula.
-                  final isPeak = spot.y == maxCount.toDouble();
+                  // En düşük puanlı günü vurgula - erken uyarı sinyali.
+                  final isLowPoint = spot.y == minRating;
                   return FlDotCirclePainter(
-                    radius: isPeak ? 5 : 0,
-                    color: lineColor,
+                    radius: isLowPoint ? 5 : 0,
+                    color: isLowPoint ? scheme.error : lineColor,
                     strokeWidth: 2,
                     strokeColor: scheme.surface,
                   );

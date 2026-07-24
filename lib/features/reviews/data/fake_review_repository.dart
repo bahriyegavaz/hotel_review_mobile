@@ -139,6 +139,42 @@ class FakeReviewRepository implements ReviewRepository {
     return List.unmodifiable(_reviews);
   }
 
+  @override
+  Future<ReviewDetail> getReviewDetail(String id) async {
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+
+    final review = _reviews.firstWhere(
+      (r) => r.id == id,
+      orElse: () => _reviews.first,
+    );
+
+    return ReviewDetail(
+      id: review.id,
+      comment: review.comment,
+      rating: review.rating,
+      reviewDate: review.reviewDate,
+      guestName: review.guestName,
+      attachments: review.photoUrl == null
+          ? const []
+          : [ReviewAttachment(fileUrl: review.photoUrl!)],
+      clauseAnalyses: review.analysis == null
+          ? const []
+          : [
+              ReviewClauseAnalysis(
+                clauseText: review.comment,
+                sentiment: review.analysis!.sentiment,
+                sentimentScore: review.analysis!.sentimentScore,
+                priority: review.analysis!.sentiment == Sentiment.negative
+                    ? 'Yüksek'
+                    : 'Bilgi',
+                categoryName: review.analysis!.category,
+                confidence: review.analysis!.confidence,
+                suggestion: review.analysis!.suggestion,
+              ),
+            ],
+    );
+  }
+
   /// Rapor bölüm 9'daki "keyword matching" yaklaşımının en ilkel hali.
   /// Gerçek Python servisi geldiğinde bu tamamen devre dışı kalacak.
   ReviewAnalysis _fakeAnalyze(String comment, int rating) {

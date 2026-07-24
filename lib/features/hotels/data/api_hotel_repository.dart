@@ -13,7 +13,7 @@ class ApiHotelRepository implements HotelRepository {
 
   /// Kullanıcının çalıştığı oteller. Auth gerektirir (JWT'den kullanıcı bulunur).
   /// Backend bunu login response'una gömerse bu endpoint gerekmeyebilir.
-  static const String _myHotelsPath = '/my-hotels';
+  static const String _myHotelsPath = '/hotels';
 
   @override
   Future<List<Hotel>> getMyHotels() async {

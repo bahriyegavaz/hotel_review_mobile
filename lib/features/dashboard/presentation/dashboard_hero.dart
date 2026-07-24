@@ -1,4 +1,5 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,10 +11,10 @@ import '../../hotels/presentation/hotel_providers.dart';
 ///
 /// Arka planda seçili otelin fotoğrafı, üstünde koyu gradient (yazı
 /// okunsun diye), otel seçici ve selamlama. Otel değişince fotoğraf
-/// otomatik değişir - currentHotelProvider'ı dinliyor.
+/// otomatik değişir.
 ///
-/// Otel seçimi artık pill'in altında açılan dropdown (PopupMenu) - ok
-/// aşağıyı gösteriyor, menü de orada açılıyor.
+/// Fotoğraf otelin LİSTEDEKİ SIRASINA göre seçiliyor (id'ye göre değil) -
+/// böylece GUID gibi id'lerde çakışma olmaz, her otel farklı görsel alır.
 class DashboardHero extends ConsumerWidget {
   const DashboardHero({
     super.key,
@@ -27,6 +28,13 @@ class DashboardHero extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hotel = ref.watch(currentHotelProvider);
+    final hotels = ref.watch(myHotelsProvider).value ?? const <Hotel>[];
+
+    // Seçili otelin listedeki sırası -> hangi görseli alacağı.
+    final rawIndex = hotel == null
+        ? -1
+        : hotels.indexWhere((h) => h.id == hotel.id);
+    final imageIndex = rawIndex < 0 ? 0 : rawIndex;
 
     return SizedBox(
       height: 240,
@@ -35,11 +43,10 @@ class DashboardHero extends ConsumerWidget {
         children: [
           // --- Arka plan: otel fotoğrafı ---
           Image.asset(
-            HotelImage.assetFor(hotel?.id),
+            HotelImage.byIndex(imageIndex),
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => Container(
-              color: const Color(0xFF1E293B),
-            ),
+            errorBuilder: (context, error, stackTrace) =>
+                Container(color: const Color(0xFF1E293B)),
           ),
           // --- Koyu gradient overlay ---
           DecoratedBox(
@@ -64,26 +71,20 @@ class DashboardHero extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // dashboard_hero.dart içindeki üstteki Row'u (otel seçici + menü olan)
-                 // bununla değiştir:
-                      Row(
-                   children: [
-                   // Menü ikonu solda.
-                  _CircleIconButton(
-                  icon: Icons.menu,
-                  onTap: onOpenMenu,
-                   ),
-                  // Otel seçici ortada - Expanded + Center ile gerçekten ortalı,
-                  // otel adı uzasa da bozulmaz.
-                  Expanded(
-                  child: Center(
-                  child: _HotelSelectorMenu(current: hotel),
-                   ),
-                ),
-                // Sağda menü ikonu genişliği kadar boşluk - simetri için.
-            const SizedBox(width: 44),
-           ],
-           ),
+                  Row(
+                    children: [
+                      // Menü ikonu solda.
+                      _CircleIconButton(icon: Icons.menu, onTap: onOpenMenu),
+                      // Otel seçici ortada - adı uzasa da ortalı kalır.
+                      Expanded(
+                        child: Center(
+                          child: _HotelSelectorMenu(current: hotel),
+                        ),
+                      ),
+                      // Sağda menü ikonu genişliği kadar boşluk - simetri için.
+                      const SizedBox(width: 44),
+                    ],
+                  ),
                   const Spacer(),
                   Text(
                     '${_greeting(DateTime.now().hour)} ${userName ?? ''} 👋',
@@ -128,8 +129,7 @@ class _HotelSelectorMenu extends ConsumerStatefulWidget {
   final Hotel? current;
 
   @override
-  ConsumerState<_HotelSelectorMenu> createState() =>
-      _HotelSelectorMenuState();
+  ConsumerState<_HotelSelectorMenu> createState() => _HotelSelectorMenuState();
 }
 
 class _HotelSelectorMenuState extends ConsumerState<_HotelSelectorMenu> {
@@ -315,15 +315,17 @@ class _HotelRow extends StatelessWidget {
                     hotel.name,
                     style: TextStyle(
                       color: scheme.onSurface,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: selected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                   if (hotel.city != null)
                     Text(
                       hotel.city!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurface.withValues(alpha: 0.7),
-                          ),
+                        color: scheme.onSurface.withValues(alpha: 0.7),
+                      ),
                     ),
                 ],
               ),

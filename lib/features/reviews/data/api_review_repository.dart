@@ -31,6 +31,9 @@ class ApiReviewRepository implements ReviewRepository {
         if (review.guestName != null && review.guestName!.isNotEmpty)
           'guestName': review.guestName,
         'source': ReviewSource.mobile.apiValue,
+        // Backend AI analizi için zorunlu tutuyor; uygulama şu an
+        // tek dil (Türkçe) olduğundan sabit gönderiyoruz.
+        'language': 'tr',
       });
 
       if (review.photoPath != null) {
@@ -78,6 +81,28 @@ class ApiReviewRepository implements ReviewRepository {
           .whereType<Map<String, dynamic>>()
           .map((json) => ReviewDto.fromJson(json).toDomain())
           .toList();
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    }
+  }
+
+  @override
+  Future<ReviewDetail> getReviewDetail(String id) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/reviews/$id');
+      final body = response.data;
+      if (body == null) throw const UnknownReviewFailure();
+
+      final apiResponse = ApiResponse<ReviewDetailDto>.fromJson(
+        body,
+        ReviewDetailDto.fromJson,
+      );
+
+      if (!apiResponse.success || apiResponse.data == null) {
+        throw UnknownReviewFailure(apiResponse.message);
+      }
+
+      return apiResponse.data!.toDomain();
     } on DioException catch (e) {
       throw _mapDioException(e);
     }

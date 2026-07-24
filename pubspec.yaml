@@ -34,6 +34,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  cached_network_image: ^3.3.1
   dio: ^5.10.0
   flutter_riverpod: ^3.3.2
   riverpod_annotation: ^4.0.3
@@ -71,9 +72,11 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/logo.png
-    - assets/images/hotels/1.jpeg
-    - assets/images/hotels/2.jpg
-    - assets/images/hotels/3.jpg
+    - assets/images/hotels/adora.jpeg
+    - assets/images/hotels/megasaray.jpeg
+    - assets/images/hotels/crystal.jpeg
+    - assets/images/hotels/rixos.jpeg
+    - assets/images/hotels/titanic.jpeg
    
 
   # To add assets to your application, add an assets section, like this:

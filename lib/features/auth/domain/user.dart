@@ -17,6 +17,8 @@ enum UserRole {
         return UserRole.manager;
       case 'departmentuser':
         return UserRole.departmentUser;
+      case 'mobileuser':
+        return UserRole.mobileUser;
       default:
         return UserRole.unknown;
     }
@@ -40,6 +42,12 @@ class User {
   final UserRole role;
   final String? departmentId;
 
-  /// Saha personeli mobilde sadece kendi departmanının aksiyonlarını görür.
-  bool get isDepartmentScoped => role == UserRole.departmentUser;
+  /// Saha personeli (DepartmentUser/MobileUser) mobilde sadece kendi
+  /// departmanının aksiyonlarını görür.
+  bool get isDepartmentScoped =>
+      role == UserRole.departmentUser || role == UserRole.mobileUser;
+
+  /// Admin/Manager tüm departmanların görevlerini görebilir.
+  bool get canViewAllDepartments =>
+      role == UserRole.admin || role == UserRole.manager;
 }

@@ -7,20 +7,43 @@
 /// Negatif detayı bu iki veriyi gösterir
 library;
 
-/// Bir günün negatif yorum sayısı - trend grafiği için.
-class DailyNegativeCount {
-  const DailyNegativeCount({required this.date, required this.count});
+/// Bir günün ortalama puanı ve yorum sayısı - trend grafiği için.
+/// GET /api/dashboard/trends
+class DailyRatingPoint {
+  const DailyRatingPoint({
+    required this.date,
+    required this.averageRating,
+    required this.reviewCount,
+  });
 
   final DateTime date;
-  final int count;
+  final double averageRating;
+  final int reviewCount;
 }
 
 /// Tekrar eden bir şikayet: kelime/konu ve kaç kez geçtiği.
+/// GET /api/dashboard/top-keywords
 class RecurringComplaint {
   const RecurringComplaint({required this.keyword, required this.count});
 
   final String keyword;
   final int count;
+}
+
+/// Bir kategorideki yorum hacmi ve negatiflik oranı.
+/// GET /api/dashboard/category-distribution
+class CategoryDistributionItem {
+  const CategoryDistributionItem({
+    required this.categoryName,
+    required this.reviewCount,
+    required this.negativeRatio,
+  });
+
+  final String categoryName;
+  final int reviewCount;
+
+  /// 0-100 arası yüzde.
+  final double negativeRatio;
 }
 
 class DashboardSummary {
@@ -30,8 +53,9 @@ class DashboardSummary {
     required this.negativeReviewCount,
     required this.totalReviewCount,
     this.averageRating,
-    this.negativeTrend = const [],
+    this.ratingTrend = const [],
     this.recurringComplaints = const [],
+    this.categoryDistribution = const [],
   });
 
   final int todayReviewCount;
@@ -40,12 +64,14 @@ class DashboardSummary {
   final int totalReviewCount;
   final double? averageRating;
 
-  /// Son günlerin negatif yorum sayıları (eskiden yeniye).
-  /// Negatif kartı açılınca gösterilir.
-  final List<DailyNegativeCount> negativeTrend;
+  /// Son günlerin ortalama puanı ve yorum sayısı (eskiden yeniye).
+  final List<DailyRatingPoint> ratingTrend;
 
   /// En sık tekrar eden şikayet kelimeleri.
   final List<RecurringComplaint> recurringComplaints;
+
+  /// Kategori başına yorum hacmi ve negatiflik oranı.
+  final List<CategoryDistributionItem> categoryDistribution;
 
   double get negativeRatio {
     if (totalReviewCount == 0) return 0;
@@ -54,18 +80,23 @@ class DashboardSummary {
 
   bool get hasHighNegativeRatio => negativeRatio > 20;
 
-  /// Trend son iki günü karşılaştırarak artıyor mu düşüyor mu.
-  /// null = yeterli veri yok.
-  bool? get isNegativeTrendRising {
-    if (negativeTrend.length < 2) return null;
-    return negativeTrend.last.count > negativeTrend[negativeTrend.length - 2].count;
+  /// Trend son iki günü karşılaştırarak puan düşüyor mu.
+  /// true = kötüleşiyor (erken uyarı). null = yeterli veri yok.
+  bool? get isRatingTrendDeclining {
+    if (ratingTrend.length < 2) return null;
+    return ratingTrend.last.averageRating <
+        ratingTrend[ratingTrend.length - 2].averageRating;
   }
 
-  /// Grafik ölçeklemesi için trenddeki en yüksek değer.
-  int get maxTrendCount {
-    if (negativeTrend.isEmpty) return 0;
-    return negativeTrend.map((d) => d.count).reduce((a, b) => a > b ? a : b);
-  }
+  /// Grafikte gösterilecek son 7 gün.
+  ///
+  /// Backend GET /api/dashboard/trends "son 7 gün" ile sınırlamıyor - veri
+  /// olan bütün günleri dönüyor (haftalarca geriye gidebiliyor). Hepsini
+  /// çizersek X ekseni etiketleri üst üste biner ("Son 7 Gün" başlığı da
+  /// yalan olur). O yüzden son 7 kaydı burada kesiyoruz.
+  List<DailyRatingPoint> get recentRatingTrend => ratingTrend.length <= 7
+      ? ratingTrend
+      : ratingTrend.sublist(ratingTrend.length - 7);
 
   static const empty = DashboardSummary(
     todayReviewCount: 0,

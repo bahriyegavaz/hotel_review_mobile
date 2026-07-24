@@ -2,7 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/network_providers.dart';
 import '../../../core/storage/storage_providers.dart';
+import '../../action_items/presentation/action_items_controller.dart';
 import '../../auth/presentation/session_controller.dart';
+import '../../dashboard/presentation/dashboard_providers.dart';
+import '../../reviews/presentation/review_providers.dart';
 import '../data/api_hotel_repository.dart';
 import '../data/fake_hotel_repository.dart';
 import '../domain/hotel.dart';
@@ -82,6 +85,19 @@ class SelectedHotelController extends Notifier<HotelSelectionState> {
   Future<void> select(Hotel hotel) async {
     await ref.read(hotelRepositoryProvider).saveSelectedHotel(hotel);
     state = HotelSelected(hotel);
+    _invalidateHotelScopedData();
+  }
+
+  /// Seçili otel değiştiğinde önceki otelin verisini gösteren tüm
+  /// önbellekleri geçersiz kılar - aksi halde Dashboard/Aksiyonlar/Yorumlar
+  /// otel değiştirilse bile eski otelin verisini göstermeye devam eder
+  /// (X-Hotel-Id header'ı yeni istekte doğru gitse bile, zaten yüklenmiş
+  /// veri kendiliğinden tazelenmez).
+  void _invalidateHotelScopedData() {
+    ref.invalidate(dashboardControllerProvider);
+    ref.invalidate(actionItemsControllerProvider);
+    ref.invalidate(myReviewsProvider);
+    ref.invalidate(reviewDetailProvider);
   }
 
   /// "Otel değiştir" - seçimi sıfırlar. Router otel seçim ekranına atar.

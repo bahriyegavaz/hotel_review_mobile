@@ -1,12 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_routes.dart';
 import '../../../core/widget/app_drawer.dart';
 import '../../../core/widget/empty_state.dart';
 import '../../../core/widget/loading_skeleton.dart';
 import '../domain/review.dart';
 import '../domain/review_repository.dart';
 import 'review_providers.dart';
+import 'review_widgets.dart';
 
 /// Kullanıcının gönderdiği yorumları listeler.
 ///
@@ -50,19 +54,20 @@ class _ReviewsListScreenState extends ConsumerState<ReviewsListScreen> {
           }
 
           // Kategorileri yorumlardan türet (analizsiz yorumlar hariç).
-          final categories = reviews
-              .map((r) => r.analysis?.category)
-              .whereType<String>()
-              .toSet()
-              .toList()
-            ..sort();
+          final categories =
+              reviews
+                  .map((r) => r.analysis?.category)
+                  .whereType<String>()
+                  .toSet()
+                  .toList()
+                ..sort();
 
           // Seçili kategoriye göre süz. null = hepsi.
           final filtered = _selectedCategory == null
               ? reviews
               : reviews
-                  .where((r) => r.analysis?.category == _selectedCategory)
-                  .toList();
+                    .where((r) => r.analysis?.category == _selectedCategory)
+                    .toList();
 
           return Column(
             children: [
@@ -151,36 +156,77 @@ class _ReviewCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _StarRow(rating: review.rating),
-                const Spacer(),
-                if (review.analysis != null)
-                  _SentimentBadge(sentiment: review.analysis!.sentiment),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('${AppRoutes.reviews}/${review.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  StarRow(rating: review.rating),
+                  const Spacer(),
+                  if (review.analysis != null)
+                    SentimentBadge(sentiment: review.analysis!.sentiment),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(review.comment, style: theme.textTheme.bodyMedium),
+              if (review.photoUrl != null) ...[
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: review.photoUrl!,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => const SizedBox(
+                      height: 200,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (context, url, error) => const SizedBox(
+                      height: 200,
+                      child: Center(child: Icon(Icons.broken_image_outlined)),
+                    ),
+                  ),
+                ),
               ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              review.comment,
-              style: theme.textTheme.bodyMedium,
-            ),
-            if (review.analysis != null) ...[
+              if (review.analysis != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(Icons.label_outline, size: 14, color: theme.hintColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      review.analysis!.category,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 10),
+              const Divider(height: 1),
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(
-                    Icons.label_outline,
-                    size: 14,
-                    color: theme.hintColor,
-                  ),
+                  Icon(Icons.person_outline, size: 14, color: theme.hintColor),
                   const SizedBox(width: 4),
                   Text(
-                    review.analysis!.category,
+                    review.guestName ?? 'İsimsiz',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.hintColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.schedule, size: 14, color: theme.hintColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatDate(review.reviewDate),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.hintColor,
                     ),
@@ -188,31 +234,7 @@ class _ReviewCard extends StatelessWidget {
                 ],
               ),
             ],
-            const SizedBox(height: 10),
-            const Divider(height: 1),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Icon(Icons.person_outline, size: 14, color: theme.hintColor),
-                const SizedBox(width: 4),
-                Text(
-                  review.guestName ?? 'İsimsiz',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.hintColor,
-                  ),
-                ),
-                const Spacer(),
-                Icon(Icons.schedule, size: 14, color: theme.hintColor),
-                const SizedBox(width: 4),
-                Text(
-                  _formatDate(review.reviewDate),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.hintColor,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -222,83 +244,6 @@ class _ReviewCard extends StatelessWidget {
     final d = date.day.toString().padLeft(2, '0');
     final m = date.month.toString().padLeft(2, '0');
     return '$d.$m.${date.year}';
-  }
-}
-
-class _StarRow extends StatelessWidget {
-  const _StarRow({required this.rating});
-
-  final int rating;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 1; i <= 5; i++)
-          Icon(
-            i <= rating ? Icons.star : Icons.star_border,
-            size: 18,
-            color: i <= rating ? Colors.amber : Theme.of(context).hintColor,
-          ),
-      ],
-    );
-  }
-}
-
-class _SentimentBadge extends StatelessWidget {
-  const _SentimentBadge({required this.sentiment});
-
-  final Sentiment sentiment;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    final (background, foreground, icon) = switch (sentiment) {
-      Sentiment.positive => (
-          scheme.primaryContainer,
-          scheme.onPrimaryContainer,
-          Icons.sentiment_satisfied_outlined,
-        ),
-      Sentiment.negative => (
-          scheme.errorContainer,
-          scheme.onErrorContainer,
-          Icons.sentiment_dissatisfied_outlined,
-        ),
-      Sentiment.neutral => (
-          scheme.surfaceContainerHighest,
-          scheme.onSurface,
-          Icons.sentiment_neutral_outlined,
-        ),
-      Sentiment.unknown => (
-          scheme.surfaceContainerHighest,
-          scheme.onSurface,
-          Icons.help_outline,
-        ),
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: foreground),
-          const SizedBox(width: 4),
-          Text(
-            sentiment.label,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: foreground),
-          ),
-        ],
-      ),
-    );
   }
 }
 

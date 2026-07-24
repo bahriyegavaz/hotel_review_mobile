@@ -7,12 +7,12 @@ sealed class DashboardFailure implements Exception {
 
 class DashboardNetworkFailure extends DashboardFailure {
   const DashboardNetworkFailure()
-      : super('Özet veriler yüklenemedi. Bağlantınızı kontrol edin.');
+    : super('Özet veriler yüklenemedi. Bağlantınızı kontrol edin.');
 }
 
 class UnknownDashboardFailure extends DashboardFailure {
   const UnknownDashboardFailure([String? message])
-      : super(message ?? 'Beklenmeyen bir hata oluştu.');
+    : super(message ?? 'Beklenmeyen bir hata oluştu.');
 }
 
 abstract class DashboardRepository {

@@ -33,4 +33,8 @@ abstract class ReviewRepository {
 
   /// GET /api/reviews - şimdilik mobil için basit liste.
   Future<List<Review>> getMyReviews();
+
+  /// GET /api/reviews/{id} - fotoğraflar ve cümle bazlı AI analizi
+  /// sadece bu detay endpoint'inde geliyor, listede yok.
+  Future<ReviewDetail> getReviewDetail(String id);
 }

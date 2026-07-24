@@ -11,7 +11,7 @@ import '../domain/review.dart';
 /// Ya da: flutter run --dart-define=USE_FAKE_REVIEWS=false
 const bool useFakeReviews = bool.fromEnvironment(
   'USE_FAKE_REVIEWS',
-  defaultValue: true,
+  defaultValue: false,
 );
 
 final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
@@ -26,4 +26,10 @@ final imagePickerServiceProvider = Provider<ImagePickerService>((ref) {
 });
 final myReviewsProvider = FutureProvider<List<Review>>((ref) {
   return ref.watch(reviewRepositoryProvider).getMyReviews();
+});
+
+/// Yorum detay ekranı: fotoğraflar ve cümle bazlı AI analizi id'ye göre çekilir.
+final reviewDetailProvider =
+    FutureProvider.family<ReviewDetail, String>((ref, id) {
+  return ref.watch(reviewRepositoryProvider).getReviewDetail(id);
 });

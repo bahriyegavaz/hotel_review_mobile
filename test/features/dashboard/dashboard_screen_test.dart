@@ -27,25 +27,40 @@ class EmptyActionItemRepository implements ActionItemRepository {
   Future<List<ActionItem>> getActionItems() async => const [];
 
   @override
-  Future<ActionItem> updateStatus({
+  Future<void> updateStatus({
     required String id,
     required ActionStatus status,
-  }) async =>
-      throw UnimplementedError();
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<void> reassignDepartment({
+    required String id,
+    required String departmentId,
+    required String departmentName,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<ActionItem> createManualActionItem({
+    required String reviewId,
+    required String departmentId,
+    required String departmentName,
+    required String title,
+    DateTime? dueDate,
+  }) async => throw UnimplementedError();
 }
 
 List<Override> _overrides(
   DashboardRepository dashboard, {
   ActionItemRepository? actions,
-}) =>
-    [
-      authRepositoryProvider.overrideWithValue(
-        StubAuthRepository(currentUser: testDepartmentUser),
-      ),
-      dashboardRepositoryProvider.overrideWithValue(dashboard),
-      actionItemRepositoryProvider
-          .overrideWithValue(actions ?? FakeActionItemRepository()),
-    ];
+}) => [
+  authRepositoryProvider.overrideWithValue(
+    StubAuthRepository(currentUser: testDepartmentUser),
+  ),
+  dashboardRepositoryProvider.overrideWithValue(dashboard),
+  actionItemRepositoryProvider.overrideWithValue(
+    actions ?? FakeActionItemRepository(),
+  ),
+];
 
 void main() {
   group('DashboardSummary domain kuralları', () {
@@ -64,18 +79,26 @@ void main() {
       expect(DashboardSummary.empty.hasHighNegativeRatio, isFalse);
     });
 
-    test('trend yükseliş/düşüş doğru belirlenir', () {
-      final rising = DashboardSummary(
+    test('puan trendi düşüş doğru belirlenir', () {
+      final declining = DashboardSummary(
         todayReviewCount: 0,
         openActionCount: 0,
         negativeReviewCount: 0,
         totalReviewCount: 0,
-        negativeTrend: [
-          DailyNegativeCount(date: DateTime(2026, 1, 1), count: 2),
-          DailyNegativeCount(date: DateTime(2026, 1, 2), count: 5),
+        ratingTrend: [
+          DailyRatingPoint(
+            date: DateTime(2026, 1, 1),
+            averageRating: 4.5,
+            reviewCount: 2,
+          ),
+          DailyRatingPoint(
+            date: DateTime(2026, 1, 2),
+            averageRating: 3.0,
+            reviewCount: 5,
+          ),
         ],
       );
-      expect(rising.isNegativeTrendRising, isTrue);
+      expect(declining.isRatingTrendDeclining, isTrue);
     });
 
     test('tek veri noktasıyla trend yönü belirsiz (null)', () {
@@ -84,11 +107,15 @@ void main() {
         openActionCount: 0,
         negativeReviewCount: 0,
         totalReviewCount: 0,
-        negativeTrend: [
-          DailyNegativeCount(date: DateTime(2026, 1, 1), count: 3),
+        ratingTrend: [
+          DailyRatingPoint(
+            date: DateTime(2026, 1, 1),
+            averageRating: 3.0,
+            reviewCount: 3,
+          ),
         ],
       );
-      expect(summary.isNegativeTrendRising, isNull);
+      expect(summary.isRatingTrendDeclining, isNull);
     });
   });
 
@@ -106,8 +133,9 @@ void main() {
       expect(find.text('4.1'), findsOneWidget);
     });
 
-    testWidgets('negatif detay (trend ve şikayetler) tıklamadan görünür',
-        (tester) async {
+    testWidgets('negatif detay (trend ve şikayetler) tıklamadan görünür', (
+      tester,
+    ) async {
       await tester.pumpApp(
         const DashboardScreen(),
         overrides: _overrides(FakeDashboardRepository()),
@@ -115,9 +143,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Negatif detay artık hep açık - karta tıklamaya gerek yok.
-      // Tekrar eden şikayetler doğrudan görünür.
-      expect(find.text('banyo'), findsOneWidget);
-      expect(find.text('havlu'), findsOneWidget);
+      // Tekrar eden şikayetler doğrudan görünür ("kelime (sayı)" formatında).
+      expect(find.text('banyo (8)'), findsOneWidget);
+      expect(find.text('havlu (6)'), findsOneWidget);
     });
 
     testWidgets('hata durumunda tekrar dene butonu çıkar', (tester) async {
@@ -146,9 +174,7 @@ void main() {
       // Selamlama saate göre değişir ve hero'da isimle birleşik, virgülsüz
       // (örn. "Günaydın Housekeeping Personeli 👋"). Bu yüzden textContaining.
       final greetings = ['Günaydın', 'Merhaba', 'İyi akşamlar', 'İyi geceler'];
-      final found = greetings.any(
-        (g) => tester.any(find.textContaining(g)),
-      );
+      final found = greetings.any((g) => tester.any(find.textContaining(g)));
       expect(found, isTrue);
     });
   });
@@ -161,8 +187,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Bekleyen görevler'), findsOneWidget);
-      expect(find.text('Tümünü gör'), findsOneWidget);
+      expect(find.text('Bekleyen Görevler'), findsOneWidget);
+      expect(find.text('Tümü'), findsOneWidget);
       // FakeActionItemRepository'de gecikmiş "Oda 304 klima" görevi var,
       // en acil olduğu için önizlemede olmalı.
       expect(find.text('Oda 304 klima arızası kontrolü'), findsOneWidget);
@@ -176,12 +202,13 @@ void main() {
       await tester.pumpAndSettle();
 
       // Fake'te 3 açık görev var ama önizlemede en fazla 2 gösterilir.
-      // "Bekleyen görevler" başlığı bir kez, kartlar en fazla iki.
-      expect(find.text('Bekleyen görevler'), findsOneWidget);
+      // "Bekleyen Görevler" başlığı bir kez, kartlar en fazla iki.
+      expect(find.text('Bekleyen Görevler'), findsOneWidget);
     });
 
-    testWidgets('açık görev yoksa önizleme bölümü hiç görünmez',
-        (tester) async {
+    testWidgets('açık görev yoksa önizleme bölümü hiç görünmez', (
+      tester,
+    ) async {
       await tester.pumpApp(
         const DashboardScreen(),
         overrides: _overrides(
@@ -191,7 +218,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Bekleyen görevler'), findsNothing);
+      expect(find.text('Bekleyen Görevler'), findsNothing);
     });
   });
 }
